@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+data/
+outputs/
+_vizdoom.ini
+
+# Training artifacts that are reproducible and noisy in Git.
+*.pt
+*.pth
+*.ckpt
+runs/**/predictions.jsonl

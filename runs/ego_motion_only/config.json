@@ -1,0 +1,20 @@
+{
+  "dataset": "data/wit_vz/processed/wit_vz_mini_001",
+  "model": "ego_motion_only",
+  "backbone": "small_cnn",
+  "epochs": 3,
+  "batch_size": 16,
+  "lr": 0.001,
+  "weight_decay": 0.0001,
+  "hidden_dim": 64,
+  "image_size": 64,
+  "loss": "huber",
+  "output_dir": "runs/ego_motion_only",
+  "seed": 7,
+  "device": "cpu",
+  "num_workers": 0,
+  "freeze_backbone": true,
+  "mixed_precision": false,
+  "num_cue_tokens": 8,
+  "temporal_type": "transformer"
+}

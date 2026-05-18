@@ -1,0 +1,24 @@
+[project]
+name = "wit-route-critic"
+version = "0.1.0"
+description = "ViZDoom egocentric future path prediction research prototype."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "pillow>=10.0",
+    "torch>=2.0",
+]
+
+[project.optional-dependencies]
+dinov2 = [
+    "transformers>=4.40",
+]
+vizdoom = [
+    "vizdoom>=1.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]

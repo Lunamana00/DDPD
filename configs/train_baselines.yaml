@@ -1,0 +1,21 @@
+dataset: data/wit_vz/processed/wit_vz_mini_001
+baselines:
+  - model: constant_velocity
+    output_dir: runs/constant_velocity
+  - model: ego_motion_only
+    output_dir: runs/ego_motion_only
+  - model: last_frame_dino
+    backbone: dinov2
+    fallback_backbone_for_offline_smoke_tests: small_cnn
+    output_dir: runs/last_frame
+  - model: video_history_dino
+    backbone: dinov2
+    fallback_backbone_for_offline_smoke_tests: small_cnn
+    output_dir: runs/video_history
+training:
+  epochs: 5
+  batch_size: 4
+  hidden_dim: 128
+  loss: huber
+  lr: 0.001
+  image_size: 64

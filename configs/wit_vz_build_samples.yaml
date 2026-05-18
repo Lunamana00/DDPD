@@ -1,0 +1,8 @@
+raw: data/wit_vz/raw/wit_vz_mini_001
+out: data/wit_vz/processed/wit_vz_mini_001
+history_sec: 1.0
+future_sec: 1.0
+sample_fps: 5
+stride: 1
+split: episode
+seed: 7

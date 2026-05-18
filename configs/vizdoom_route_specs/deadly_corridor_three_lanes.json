@@ -1,0 +1,44 @@
+{
+  "name": "deadly_corridor_three_lanes_bootstrap",
+  "scenario": "deadly_corridor",
+  "map": "map01",
+  "description": "Bootstrap three-lane route spec for collecting route-conditioned ViZDoom rollouts. Calibrate waypoints against the target WAD before using labels as ground truth.",
+  "coordinate_system": "ViZDoom map coordinates, using POSITION_X and POSITION_Y",
+  "labeling": {
+    "strategy": "nearest-route-majority",
+    "ignore_first_steps": 10,
+    "max_route_distance": null
+  },
+  "routes": [
+    {
+      "id": "left_lane",
+      "description": "Left-side corridor hypothesis. Replace with calibrated map waypoints for production data.",
+      "waypoints": [
+        [-384.0, -64.0],
+        [-128.0, -64.0],
+        [128.0, -64.0],
+        [384.0, -64.0]
+      ]
+    },
+    {
+      "id": "center_lane",
+      "description": "Center corridor hypothesis. Replace with calibrated map waypoints for production data.",
+      "waypoints": [
+        [-384.0, 0.0],
+        [-128.0, 0.0],
+        [128.0, 0.0],
+        [384.0, 0.0]
+      ]
+    },
+    {
+      "id": "right_lane",
+      "description": "Right-side corridor hypothesis. Replace with calibrated map waypoints for production data.",
+      "waypoints": [
+        [-384.0, 64.0],
+        [-128.0, 64.0],
+        [128.0, 64.0],
+        [384.0, 64.0]
+      ]
+    }
+  ]
+}

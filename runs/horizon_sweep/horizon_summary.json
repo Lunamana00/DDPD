@@ -1,0 +1,92 @@
+[
+  {
+    "horizon_sec": 1,
+    "num_samples": 594,
+    "future_steps": 5,
+    "cv_ADE": 39.23044643980084,
+    "cv_FDE": 60.18679647734671,
+    "model_ADE": 37.91527811686198,
+    "model_FDE": 58.80769590897994
+  },
+  {
+    "horizon_sec": 2,
+    "num_samples": 549,
+    "future_steps": 10,
+    "cv_ADE": 62.98735309038006,
+    "cv_FDE": 105.92621575027216,
+    "model_ADE": 63.098867572721886,
+    "model_FDE": 100.05503795186027
+  },
+  {
+    "horizon_sec": 3,
+    "num_samples": 504,
+    "future_steps": 15,
+    "cv_ADE": 86.38911356244769,
+    "cv_FDE": 151.74037170410156,
+    "model_ADE": 79.35974557059151,
+    "model_FDE": 125.66115406581334
+  },
+  {
+    "horizon_sec": 4,
+    "num_samples": 459,
+    "future_steps": 20,
+    "cv_ADE": 110.78410129921109,
+    "cv_FDE": 200.38453285366882,
+    "model_ADE": 92.68769402597465,
+    "model_FDE": 141.91314353194892
+  },
+  {
+    "horizon_sec": 5,
+    "num_samples": 414,
+    "future_steps": 25,
+    "cv_ADE": 134.8381745711617,
+    "cv_FDE": 252.06632066809613,
+    "model_ADE": 111.14869192372198,
+    "model_FDE": 165.95367564325747
+  },
+  {
+    "horizon_sec": 6,
+    "num_samples": 369,
+    "future_steps": 30,
+    "cv_ADE": 161.35057253953886,
+    "cv_FDE": 288.32829024152056,
+    "model_ADE": 129.8960044674757,
+    "model_FDE": 183.48109733767626
+  },
+  {
+    "horizon_sec": 7,
+    "num_samples": 324,
+    "future_steps": 35,
+    "cv_ADE": 191.08313496907553,
+    "cv_FDE": 340.2279239230686,
+    "model_ADE": 144.16812303331164,
+    "model_FDE": 221.70328521728516
+  },
+  {
+    "horizon_sec": 8,
+    "num_samples": 279,
+    "future_steps": 40,
+    "cv_ADE": 221.1715801608178,
+    "cv_FDE": 416.95053986580143,
+    "model_ADE": 162.99823047268777,
+    "model_FDE": 268.3495601530998
+  },
+  {
+    "horizon_sec": 9,
+    "num_samples": 234,
+    "future_steps": 45,
+    "cv_ADE": 255.2140397291917,
+    "cv_FDE": 502.800783597506,
+    "model_ADE": 156.4600337101863,
+    "model_FDE": 272.76393244816705
+  },
+  {
+    "horizon_sec": 10,
+    "num_samples": 189,
+    "future_steps": 50,
+    "cv_ADE": 315.8391411190941,
+    "cv_FDE": 602.4937569754464,
+    "model_ADE": 178.9177994501023,
+    "model_FDE": 297.9202793666295
+  }
+]

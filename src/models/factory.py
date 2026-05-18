@@ -60,6 +60,7 @@ def create_model(
             dropout=float(kwargs.get("dropout", 0.1)),
             use_constant_velocity_residual=bool(kwargs.get("use_constant_velocity_residual", True)),
             residual_scale=float(kwargs.get("residual_scale", 1.0)),
+            num_modes=int(kwargs.get("num_modes", 1)),
         )
     raise ValueError(f"Unknown model: {model_name}")
 

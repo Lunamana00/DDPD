@@ -1,6 +1,11 @@
 .venv/
 __pycache__/
 .pytest_cache/
+.pytest_tmp/
+.tmp*/
+pytest-cache-files-*/
+.codex-test-tmp/
+.codex-git/
 *.pyc
 .ruff_cache/
 .mypy_cache/

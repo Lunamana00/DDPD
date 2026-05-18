@@ -1,7 +1,7 @@
 import torch
 
 from src.losses import trajectory_loss
-from src.metrics import ade, fde
+from src.metrics import ade, fde, select_best_trajectory
 from src.models.baselines import ConstantVelocityBaseline, EgoMotionOnlyModel
 from src.models.cue_memory import TwoStreamEgocentricCueMemoryPathPredictor
 from src.models.motion import constant_velocity_path
@@ -37,6 +37,20 @@ def test_cue_memory_model_forward_shape():
     assert out.shape == (2, 3, 2)
 
 
+def test_cue_memory_transformer_forward_shape():
+    batch = make_batch(batch=2, history=4, future=3)
+    model = TwoStreamEgocentricCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="small_cnn",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="transformer",
+        freeze_backbone=False,
+    )
+    out = model(batch)
+    assert out.shape == (2, 3, 2)
+
+
 def test_cue_memory_residual_initializes_to_constant_velocity():
     batch = make_batch(batch=2, history=5, future=3)
     model = TwoStreamEgocentricCueMemoryPathPredictor(
@@ -54,6 +68,41 @@ def test_cue_memory_residual_initializes_to_constant_velocity():
     assert torch.allclose(out, expected, atol=1e-6)
 
 
+def test_cue_memory_multimodal_forward_shape():
+    batch = make_batch(batch=2, history=5, future=3)
+    model = TwoStreamEgocentricCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="small_cnn",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="gru",
+        freeze_backbone=False,
+        num_modes=3,
+    )
+    out = model(batch)
+    assert set(out) == {"paths", "logits"}
+    assert out["paths"].shape == (2, 3, 3, 2)
+    assert out["logits"].shape == (2, 3)
+
+
+def test_cue_memory_multimodal_residual_initializes_to_constant_velocity():
+    batch = make_batch(batch=2, history=5, future=3)
+    model = TwoStreamEgocentricCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="small_cnn",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="gru",
+        freeze_backbone=False,
+        use_constant_velocity_residual=True,
+        residual_scale=25.0,
+        num_modes=3,
+    )
+    out = model(batch)
+    expected = constant_velocity_path(batch["ego_history"], future_steps=3)
+    assert torch.allclose(out["paths"], expected[:, None, :, :].expand_as(out["paths"]), atol=1e-6)
+
+
 def test_loss_and_metrics():
     pred = torch.zeros(2, 3, 2)
     target = torch.ones(2, 3, 2)
@@ -63,6 +112,27 @@ def test_loss_and_metrics():
     assert 0 < scaled_loss.item() < loss.item()
     assert ade(pred, target).item() > 0
     assert fde(pred, target).item() > 0
+
+
+def test_multimodal_loss_and_metrics_choose_best_candidate():
+    target = torch.zeros(2, 3, 2)
+    pred = {
+        "paths": torch.stack(
+            [
+                torch.ones(2, 3, 2) * 10.0,
+                target.clone(),
+                torch.ones(2, 3, 2) * -10.0,
+            ],
+            dim=1,
+        ),
+        "logits": torch.zeros(2, 3),
+    }
+    loss = trajectory_loss(pred, target, multimodal_confidence_weight=0.0)
+    selected = select_best_trajectory(pred, target)
+    assert loss.item() == 0.0
+    assert torch.allclose(selected, target)
+    assert ade(pred, target).item() == 0.0
+    assert fde(pred, target).item() == 0.0
 
 
 def test_tiny_overfit_reduces_loss():

@@ -44,7 +44,9 @@ def main() -> None:
         hidden_dim=int(checkpoint.get("hidden_dim", 128)),
         freeze_backbone=bool(checkpoint.get("freeze_backbone", True)),
         num_cue_tokens=int(checkpoint.get("num_cue_tokens", 8)),
+        num_modes=int(checkpoint.get("num_modes", 1)),
         temporal_type=str(checkpoint.get("temporal_type", "transformer")),
+        dropout=float(checkpoint.get("dropout", 0.1)),
         use_constant_velocity_residual=bool(checkpoint.get("use_constant_velocity_residual", False)),
         residual_scale=float(checkpoint.get("residual_scale", checkpoint.get("trajectory_scale", 1.0))),
     ).to(device)
@@ -63,6 +65,7 @@ def main() -> None:
         device,
         str(checkpoint.get("loss", "huber")),
         float(checkpoint.get("trajectory_scale", 1.0)),
+        float(checkpoint.get("multimodal_confidence_weight", 0.05)),
     )
     metrics["model"] = model_name
     metrics["split"] = args.split

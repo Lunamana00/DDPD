@@ -12,7 +12,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .losses import trajectory_loss
-from .metrics import ade, fde, per_horizon_error
+from .metrics import ade, fde, per_horizon_error, select_best_trajectory
 from .models.factory import create_model, needs_rgb
 from .wit_vz.dataset import WITVZPathDataset, collate_path_batch
 
@@ -26,6 +26,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-size", type=int, default=4)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--grad-clip-norm", type=float, default=1.0)
+    parser.add_argument("--early-stopping-patience", type=int, default=100)
+    parser.add_argument("--early-stopping-min-delta", type=float, default=0.0)
+    parser.add_argument("--lr-scheduler-patience", type=int, default=25)
+    parser.add_argument("--lr-scheduler-factor", type=float, default=0.5)
+    parser.add_argument("--min-lr", type=float, default=1e-6)
     parser.add_argument("--hidden-dim", type=int, default=128)
     parser.add_argument("--image-size", type=int, default=64)
     parser.add_argument("--loss", choices=["huber", "mse", "l2"], default="huber")
@@ -37,6 +44,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--train-backbone", dest="freeze_backbone", action="store_false")
     parser.add_argument("--mixed-precision", action="store_true")
     parser.add_argument("--num-cue-tokens", type=int, default=8)
+    parser.add_argument("--num-modes", type=int, default=1)
+    parser.add_argument("--multimodal-confidence-weight", type=float, default=0.05)
     parser.add_argument("--temporal-type", choices=["transformer", "gru"], default="transformer")
     parser.add_argument(
         "--trajectory-scale",
@@ -103,6 +112,7 @@ def evaluate_loader(
     device: torch.device,
     loss_type: str,
     coordinate_scale: float = 1.0,
+    multimodal_confidence_weight: float = 0.05,
 ) -> tuple[dict[str, float], list[dict[str, Any]]]:
     model.eval()
     total_loss = 0.0
@@ -115,7 +125,14 @@ def evaluate_loader(
         batch = move_batch(batch, device)
         pred = model(batch)
         target = batch["future_path"]
-        loss = trajectory_loss(pred, target, loss_type, coordinate_scale=coordinate_scale)
+        loss = trajectory_loss(
+            pred,
+            target,
+            loss_type,
+            coordinate_scale=coordinate_scale,
+            multimodal_confidence_weight=multimodal_confidence_weight,
+        )
+        selected_pred = select_best_trajectory(pred, target)
         batch_size = target.shape[0]
         total_loss += float(loss.detach().cpu()) * batch_size
         total_ade += float(ade(pred, target).detach().cpu()) * batch_size
@@ -123,15 +140,18 @@ def evaluate_loader(
         horizon_errors.append(per_horizon_error(pred, target).detach().cpu() * batch_size)
         total_count += batch_size
         for i, sample_id in enumerate(batch["sample_id"]):
-            predictions.append(
-                {
-                    "sample_id": sample_id,
-                    "prediction": pred[i].detach().cpu().tolist(),
-                    "target": target[i].detach().cpu().tolist(),
-                    "ADE": float(torch.linalg.norm(pred[i] - target[i], dim=-1).mean().detach().cpu()),
-                    "FDE": float(torch.linalg.norm(pred[i, -1] - target[i, -1]).detach().cpu()),
-                }
-            )
+            item = {
+                "sample_id": sample_id,
+                "prediction": selected_pred[i].detach().cpu().tolist(),
+                "target": target[i].detach().cpu().tolist(),
+                "ADE": float(torch.linalg.norm(selected_pred[i] - target[i], dim=-1).mean().detach().cpu()),
+                "FDE": float(torch.linalg.norm(selected_pred[i, -1] - target[i, -1]).detach().cpu()),
+            }
+            if isinstance(pred, dict):
+                item["candidate_predictions"] = pred["paths"][i].detach().cpu().tolist()
+                if "logits" in pred:
+                    item["mode_logits"] = pred["logits"][i].detach().cpu().tolist()
+            predictions.append(item)
     if total_count == 0:
         raise ValueError("Evaluation loader produced no samples")
     per_h = torch.stack(horizon_errors, dim=0).sum(dim=0) / total_count
@@ -178,7 +198,17 @@ def save_checkpoint(
             "history_frames": dataset_manifest["history_frames"],
             "freeze_backbone": args.freeze_backbone,
             "num_cue_tokens": args.num_cue_tokens,
+            "num_modes": args.num_modes,
+            "multimodal_confidence_weight": args.multimodal_confidence_weight,
             "temporal_type": args.temporal_type,
+            "dropout": args.dropout,
+            "weight_decay": args.weight_decay,
+            "grad_clip_norm": args.grad_clip_norm,
+            "early_stopping_patience": args.early_stopping_patience,
+            "early_stopping_min_delta": args.early_stopping_min_delta,
+            "lr_scheduler_patience": args.lr_scheduler_patience,
+            "lr_scheduler_factor": args.lr_scheduler_factor,
+            "min_lr": args.min_lr,
             "trajectory_scale": float(getattr(args, "resolved_trajectory_scale", 1.0)),
             "residual_scale": float(getattr(args, "resolved_residual_scale", 1.0)),
             "use_constant_velocity_residual": bool(getattr(args, "use_constant_velocity_residual", True)),
@@ -212,7 +242,9 @@ def main() -> None:
         hidden_dim=args.hidden_dim,
         freeze_backbone=args.freeze_backbone,
         num_cue_tokens=args.num_cue_tokens,
+        num_modes=args.num_modes,
         temporal_type=args.temporal_type,
+        dropout=args.dropout,
         use_constant_velocity_residual=args.use_constant_velocity_residual,
         residual_scale=residual_scale,
     ).to(device)
@@ -226,8 +258,22 @@ def main() -> None:
     (args.output_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
 
     if args.model == "constant_velocity":
-        val_metrics, _ = evaluate_loader(model, val_loader, device, args.loss, trajectory_scale)
-        test_metrics, predictions = evaluate_loader(model, test_loader, device, args.loss, trajectory_scale)
+        val_metrics, _ = evaluate_loader(
+            model,
+            val_loader,
+            device,
+            args.loss,
+            trajectory_scale,
+            args.multimodal_confidence_weight,
+        )
+        test_metrics, predictions = evaluate_loader(
+            model,
+            test_loader,
+            device,
+            args.loss,
+            trajectory_scale,
+            args.multimodal_confidence_weight,
+        )
         metrics = {"val": val_metrics, "test": test_metrics, "model": args.model}
         (args.output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
         save_checkpoint(args.output_dir / "best.pt", model, args, dataset_manifest, metrics)
@@ -242,40 +288,112 @@ def main() -> None:
         lr=args.lr,
         weight_decay=args.weight_decay,
     )
+    scheduler = None
+    if args.lr_scheduler_patience > 0 and 0.0 < args.lr_scheduler_factor < 1.0:
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",
+            factor=args.lr_scheduler_factor,
+            patience=args.lr_scheduler_patience,
+            min_lr=args.min_lr,
+        )
     scaler = torch.amp.GradScaler("cuda", enabled=args.mixed_precision and device.type == "cuda")
     best_val = float("inf")
+    best_epoch = 0
+    epochs_without_improvement = 0
     history = []
 
     for epoch in range(1, args.epochs + 1):
         model.train()
         total_loss = 0.0
+        total_ade = 0.0
         total_count = 0
         for batch in train_loader:
             batch = move_batch(batch, device)
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast("cuda", enabled=args.mixed_precision and device.type == "cuda"):
                 pred = model(batch)
-                loss = trajectory_loss(pred, batch["future_path"], args.loss, coordinate_scale=trajectory_scale)
+                loss = trajectory_loss(
+                    pred,
+                    batch["future_path"],
+                    args.loss,
+                    coordinate_scale=trajectory_scale,
+                    multimodal_confidence_weight=args.multimodal_confidence_weight,
+                )
+            if not torch.isfinite(loss):
+                raise FloatingPointError(f"Non-finite loss at epoch {epoch}: {float(loss.detach().cpu())}")
             scaler.scale(loss).backward()
+            if args.grad_clip_norm > 0:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(
+                    [param for param in model.parameters() if param.requires_grad],
+                    max_norm=args.grad_clip_norm,
+                )
             scaler.step(optimizer)
             scaler.update()
             batch_size = batch["future_path"].shape[0]
             total_loss += float(loss.detach().cpu()) * batch_size
+            total_ade += float(ade(pred, batch["future_path"]).detach().cpu()) * batch_size
             total_count += batch_size
 
         train_loss = total_loss / max(total_count, 1)
-        val_metrics, _ = evaluate_loader(model, val_loader, device, args.loss, trajectory_scale)
-        row = {"epoch": epoch, "train_loss": train_loss, "val": val_metrics}
+        train_ade = total_ade / max(total_count, 1)
+        val_metrics, _ = evaluate_loader(
+            model,
+            val_loader,
+            device,
+            args.loss,
+            trajectory_scale,
+            args.multimodal_confidence_weight,
+        )
+        if scheduler is not None:
+            scheduler.step(val_metrics["ADE"])
+        current_lr = float(optimizer.param_groups[0]["lr"])
+        row = {
+            "epoch": epoch,
+            "train_loss": train_loss,
+            "train_ADE": train_ade,
+            "val_train_ADE_gap": val_metrics["ADE"] - train_ade,
+            "lr": current_lr,
+            "val": val_metrics,
+        }
         history.append(row)
-        print(f"epoch={epoch} train_loss={train_loss:.4f} val_ADE={val_metrics['ADE']:.4f}")
-        if val_metrics["ADE"] < best_val:
+        print(
+            f"epoch={epoch} train_loss={train_loss:.4f} "
+            f"train_ADE={train_ade:.4f} val_ADE={val_metrics['ADE']:.4f} lr={current_lr:.2e}"
+        )
+        if val_metrics["ADE"] < best_val - args.early_stopping_min_delta:
             best_val = val_metrics["ADE"]
+            best_epoch = epoch
+            epochs_without_improvement = 0
             save_checkpoint(args.output_dir / "best.pt", model, args, dataset_manifest, row)
+        else:
+            epochs_without_improvement += 1
+        if args.early_stopping_patience > 0 and epochs_without_improvement >= args.early_stopping_patience:
+            print(
+                "early_stopping="
+                f"epoch={epoch} best_epoch={best_epoch} best_val_ADE={best_val:.4f}"
+            )
+            break
 
     checkpoint = torch.load(args.output_dir / "best.pt", map_location=device)
     model.load_state_dict(checkpoint["model_state"])
-    val_metrics, _ = evaluate_loader(model, val_loader, device, args.loss, trajectory_scale)
-    test_metrics, predictions = evaluate_loader(model, test_loader, device, args.loss, trajectory_scale)
+    val_metrics, _ = evaluate_loader(
+        model,
+        val_loader,
+        device,
+        args.loss,
+        trajectory_scale,
+        args.multimodal_confidence_weight,
+    )
+    test_metrics, predictions = evaluate_loader(
+        model,
+        test_loader,
+        device,
+        args.loss,
+        trajectory_scale,
+        args.multimodal_confidence_weight,
+    )
     metrics = {"model": args.model, "history": history, "val": val_metrics, "test": test_metrics}
     (args.output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     save_checkpoint(args.output_dir / "best.pt", model, args, dataset_manifest, metrics)

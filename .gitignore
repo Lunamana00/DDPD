@@ -7,6 +7,7 @@ pytest-cache-files-*/
 .codex-test-tmp/
 .codex-git/
 .git.blocked.bak/
+.git.protected.bak/
 *.pyc
 .ruff_cache/
 .mypy_cache/

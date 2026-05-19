@@ -3,10 +3,25 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import torch.nn.functional as F
 
 import torch
 from torch import nn
+
+
+def _patch_restrictive_windows_mkdir() -> None:
+    if os.name != "nt" or getattr(os.mkdir, "_wit_vz_patched", False):
+        return
+    original_mkdir = os.mkdir
+
+    def mkdir_without_restrictive_mode(path, mode=0o777, *args, **kwargs):
+        if mode == 0o700:
+            mode = 0o777
+        return original_mkdir(path, mode, *args, **kwargs)
+
+    mkdir_without_restrictive_mode._wit_vz_patched = True
+    os.mkdir = mkdir_without_restrictive_mode
 
 
 class SmallCNNTokenEncoder(nn.Module):
@@ -168,6 +183,88 @@ class DinoV3TokenEncoder(nn.Module):
         return tokens.reshape(batch, time, tokens.shape[1], tokens.shape[2])
 
 
+class TimmDinoV3ConvNeXtTokenEncoder(nn.Module):
+    """DINOv3 ConvNeXt feature encoder from timm/Hugging Face Hub."""
+
+    MODEL_ALIASES = {
+        "dinov3-convnext-tiny": "hf-hub:timm/convnext_tiny.dinov3_lvd1689m",
+        "dinov3_convnext_tiny": "hf-hub:timm/convnext_tiny.dinov3_lvd1689m",
+        "timm/convnext_tiny.dinov3_lvd1689m": "hf-hub:timm/convnext_tiny.dinov3_lvd1689m",
+        "hf-hub:timm/convnext_tiny.dinov3_lvd1689m": "hf-hub:timm/convnext_tiny.dinov3_lvd1689m",
+    }
+
+    def __init__(
+        self,
+        model_name: str = "hf-hub:timm/convnext_tiny.dinov3_lvd1689m",
+        freeze: bool = True,
+        image_size: int = 256,
+    ) -> None:
+        super().__init__()
+        if importlib.util.find_spec("timm") is None:
+            raise RuntimeError(
+                "DINOv3 ConvNeXt via timm requires the optional 'timm' package. "
+                "Install it or use --backbone small_cnn."
+            )
+        _patch_restrictive_windows_mkdir()
+        import timm
+
+        resolved_model_name = self.MODEL_ALIASES.get(model_name.lower(), model_name)
+        self.model = timm.create_model(
+            resolved_model_name,
+            pretrained=True,
+            features_only=True,
+            out_indices=(-1,),
+        )
+        self.model_name = resolved_model_name
+        self.freeze = freeze
+        self.image_size = image_size
+        self.out_dim = int(self.model.feature_info.channels()[-1])
+        self.register_buffer(
+            "mean",
+            torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1),
+            persistent=False,
+        )
+        self.register_buffer(
+            "std",
+            torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1),
+            persistent=False,
+        )
+        if freeze:
+            for param in self.model.parameters():
+                param.requires_grad = False
+            self.model.eval()
+
+    def train(self, mode: bool = True) -> "TimmDinoV3ConvNeXtTokenEncoder":
+        super().train(mode)
+        if self.freeze:
+            self.model.eval()
+        return self
+
+    def _prepare_images(self, images: torch.Tensor) -> torch.Tensor:
+        if images.shape[-2:] != (self.image_size, self.image_size):
+            images = F.interpolate(
+                images,
+                size=(self.image_size, self.image_size),
+                mode="bilinear",
+                align_corners=False,
+                antialias=True,
+            )
+        return (images - self.mean.to(images.dtype)) / self.std.to(images.dtype)
+
+    def forward(self, frames: torch.Tensor) -> torch.Tensor:
+        # frames: [B, T, C, H, W], expected in [0, 1].
+        batch, time, channels, height, width = frames.shape
+        images = frames.reshape(batch * time, channels, height, width)
+        images = self._prepare_images(images)
+        if self.freeze:
+            with torch.no_grad():
+                features = self.model(images)[-1]
+        else:
+            features = self.model(images)[-1]
+        tokens = features.flatten(2).transpose(1, 2)
+        return tokens.reshape(batch, time, tokens.shape[1], tokens.shape[2])
+
+
 def build_visual_encoder(backbone_name: str, hidden_dim: int, freeze_backbone: bool = True) -> nn.Module:
     name = backbone_name.lower()
     if name in {"small_cnn", "cnn", "test_cnn"}:
@@ -178,6 +275,8 @@ def build_visual_encoder(backbone_name: str, hidden_dim: int, freeze_backbone: b
         return encoder
     if name in {"dinov2", "dino", "facebook/dinov2-small"}:
         return DinoV2TokenEncoder(freeze=freeze_backbone)
+    if name in TimmDinoV3ConvNeXtTokenEncoder.MODEL_ALIASES:
+        return TimmDinoV3ConvNeXtTokenEncoder(model_name=backbone_name, freeze=freeze_backbone)
     if name.startswith("dinov3") or "facebook/dinov3" in name:
         return DinoV3TokenEncoder(model_name=backbone_name, freeze=freeze_backbone)
     raise ValueError(f"Unknown visual backbone: {backbone_name}")

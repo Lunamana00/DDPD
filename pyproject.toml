@@ -12,7 +12,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dinov2 = [
-    "transformers>=4.40",
+    "transformers>=4.56",
+]
+dinov3 = [
+    "transformers>=4.56",
 ]
 vizdoom = [
     "vizdoom>=1.2",

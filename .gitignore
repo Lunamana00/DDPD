@@ -21,3 +21,6 @@ _vizdoom.ini
 *.pth
 *.ckpt
 runs/**/predictions.jsonl
+runs/cue_memory_arch_v2_multimodal*/
+runs/cue_memory_regularized*/
+runs/cue_memory_dinov3*/

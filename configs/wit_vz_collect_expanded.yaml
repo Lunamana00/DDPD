@@ -1,0 +1,13 @@
+scenario: deadly_corridor
+map: map01
+run_id: wit_vz_expanded_001
+episodes: 120
+max_steps: 600
+frame_skip: 4
+mode: scripted
+policy: corridor
+save_rgb: true
+save_depth: false
+save_labels: false
+save_automap: false
+seed: 101

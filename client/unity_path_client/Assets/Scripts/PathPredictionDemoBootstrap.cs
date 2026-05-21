@@ -7,7 +7,7 @@ public static class PathPredictionDemoBootstrap
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void CreateDemoIfNeeded()
     {
-        if (Object.FindObjectOfType<PathPredictionClient>() != null)
+        if (Object.FindFirstObjectByType<PathPredictionClient>() != null)
         {
             return;
         }

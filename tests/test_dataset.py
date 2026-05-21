@@ -3,7 +3,9 @@ from pathlib import Path
 
 from PIL import Image
 
-from src.wit_vz.dataset import WITVZPathDataset
+import torch
+
+from src.wit_vz.dataset import WITVZPathDataset, collate_path_batch
 
 
 def write_json(path: Path, data):
@@ -59,3 +61,22 @@ def test_processed_dataset_sample_shapes(tmp_path):
     assert item["rgb_history"].shape == (3, 3, 16, 16)
     assert item["ego_history"].shape == (3, 3)
     assert item["future_path"].shape == (2, 2)
+
+    cache = tmp_path / "feature_cache"
+    feature_dir = cache / "features"
+    feature_dir.mkdir(parents=True)
+    torch.save({"visual_tokens": torch.ones(3, 4, 8)}, feature_dir / "s1.pt")
+
+    cached_dataset = WITVZPathDataset(
+        processed,
+        split="train",
+        image_size=16,
+        load_rgb=False,
+        visual_feature_cache_dir=cache,
+    )
+    cached_item = cached_dataset[0]
+    assert "rgb_history" not in cached_item
+    assert cached_item["visual_tokens"].shape == (3, 4, 8)
+
+    batch = collate_path_batch([cached_item, cached_item])
+    assert batch["visual_tokens"].shape == (2, 3, 4, 8)

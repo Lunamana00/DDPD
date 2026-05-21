@@ -30,6 +30,7 @@ class WITVZPathDataset(Dataset):
         split: str = "train",
         image_size: int | tuple[int, int] = 64,
         load_rgb: bool = True,
+        visual_feature_cache_dir: str | Path | None = None,
     ) -> None:
         self.dataset_dir = Path(dataset_dir)
         self.manifest = load_json(self.dataset_dir / "dataset_manifest.json")
@@ -40,6 +41,9 @@ class WITVZPathDataset(Dataset):
                 self.raw_dir = Path(self.manifest["raw_dir"]).resolve()
         self.image_size = image_size
         self.load_rgb = load_rgb
+        self.visual_feature_cache_dir = (
+            Path(visual_feature_cache_dir) if visual_feature_cache_dir is not None else None
+        )
 
         all_samples = read_jsonl(self.dataset_dir / "samples.jsonl")
         splits = load_json(self.dataset_dir / "splits.json")
@@ -77,6 +81,16 @@ class WITVZPathDataset(Dataset):
                 for path in sample["rgb_history_paths"]
             ]
             item["rgb_history"] = torch.stack(frames, dim=0)
+        if self.visual_feature_cache_dir is not None:
+            feature_path = self.visual_feature_cache_dir / "features" / f"{sample['sample_id']}.pt"
+            if not feature_path.exists():
+                raise FileNotFoundError(f"Missing cached visual feature file: {feature_path}")
+            cached = torch.load(feature_path, map_location="cpu")
+            if isinstance(cached, dict):
+                tokens = cached["visual_tokens"]
+            else:
+                tokens = cached
+            item["visual_tokens"] = tokens.float()
         return item
 
 
@@ -93,4 +107,6 @@ def collate_path_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
     }
     if "rgb_history" in batch[0]:
         output["rgb_history"] = torch.stack([item["rgb_history"] for item in batch], dim=0)
+    if "visual_tokens" in batch[0]:
+        output["visual_tokens"] = torch.stack([item["visual_tokens"] for item in batch], dim=0)
     return output

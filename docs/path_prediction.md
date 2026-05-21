@@ -42,6 +42,16 @@ The implementation supports a DINOv2 path through optional `transformers` depend
 
 Adapter note: the MVP implements the bottleneck adapter as a clean post-token adapter around selected visual features. This approximates "adapter after selected frozen visual blocks"; it is not an exact in-block ViT adapter insertion yet.
 
+For DINOv3 experiments, the preferred training path is to cache frozen visual tokens first:
+
+```text
+scripts/cache_visual_features.py
+  -> data/wit_vz/feature_cache/<dataset>_dinov3_convnext_tiny/
+  -> train with --backbone cached_dinov3_convnext_tiny --visual-feature-cache <cache>
+```
+
+This avoids rerunning DINOv3 on every epoch and keeps the paper-aligned temporal/memory head training stable.
+
 ## Dataset Schema
 
 Raw WIT-VZ data is stored as:

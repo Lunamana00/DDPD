@@ -265,6 +265,25 @@ class TimmDinoV3ConvNeXtTokenEncoder(nn.Module):
         return tokens.reshape(batch, time, tokens.shape[1], tokens.shape[2])
 
 
+class CachedVisualTokenEncoder(nn.Module):
+    """Placeholder encoder for precomputed visual tokens supplied by the batch."""
+
+    MODEL_DIMS = {
+        "cached_features": 768,
+        "cached_dinov3": 768,
+        "cached_dinov3_convnext_tiny": 768,
+        "cached_dinov3-convnext-tiny": 768,
+        "cached_timm_dinov3_convnext_tiny": 768,
+    }
+
+    def __init__(self, out_dim: int = 768) -> None:
+        super().__init__()
+        self.out_dim = out_dim
+
+    def forward(self, frames: torch.Tensor) -> torch.Tensor:
+        raise RuntimeError("Cached visual backbones require batch['visual_tokens']; no RGB forward is available.")
+
+
 def build_visual_encoder(backbone_name: str, hidden_dim: int, freeze_backbone: bool = True) -> nn.Module:
     name = backbone_name.lower()
     if name in {"small_cnn", "cnn", "test_cnn"}:
@@ -273,6 +292,8 @@ def build_visual_encoder(backbone_name: str, hidden_dim: int, freeze_backbone: b
             for param in encoder.parameters():
                 param.requires_grad = False
         return encoder
+    if name in CachedVisualTokenEncoder.MODEL_DIMS:
+        return CachedVisualTokenEncoder(CachedVisualTokenEncoder.MODEL_DIMS[name])
     if name in {"dinov2", "dino", "facebook/dinov2-small"}:
         return DinoV2TokenEncoder(freeze=freeze_backbone)
     if name in TimmDinoV3ConvNeXtTokenEncoder.MODEL_ALIASES:

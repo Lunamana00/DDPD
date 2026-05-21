@@ -20,6 +20,7 @@ from .wit_vz.dataset import WITVZPathDataset, collate_path_batch
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train a WIT-VZ path predictor.")
     parser.add_argument("--dataset", type=Path, required=True)
+    parser.add_argument("--visual-feature-cache", type=Path, default=None)
     parser.add_argument("--model", required=True)
     parser.add_argument("--backbone", default="small_cnn")
     parser.add_argument("--epochs", type=int, default=5)
@@ -91,7 +92,7 @@ def choose_device(requested: str) -> torch.device:
 
 def move_batch(batch: dict[str, Any], device: torch.device) -> dict[str, Any]:
     moved = dict(batch)
-    for key in ("rgb_history", "ego_history", "future_path"):
+    for key in ("rgb_history", "visual_tokens", "ego_history", "future_path"):
         if key in moved:
             moved[key] = moved[key].to(device)
     return moved
@@ -183,6 +184,7 @@ def make_loader(args: argparse.Namespace, split: str, load_rgb: bool) -> DataLoa
         split=split,
         image_size=args.image_size,
         load_rgb=load_rgb,
+        visual_feature_cache_dir=getattr(args, "visual_feature_cache", None),
     )
     return DataLoader(
         dataset,
@@ -206,6 +208,9 @@ def save_checkpoint(
             "model_state": model.state_dict(),
             "model_name": args.model,
             "backbone": args.backbone,
+            "visual_feature_cache": (
+                args.visual_feature_cache.as_posix() if args.visual_feature_cache is not None else None
+            ),
             "hidden_dim": args.hidden_dim,
             "image_size": args.image_size,
             "future_steps": dataset_manifest["future_steps"],
@@ -245,7 +250,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     device = choose_device(args.device)
     dataset_manifest = json.loads((args.dataset / "dataset_manifest.json").read_text())
-    load_rgb = needs_rgb(args.model)
+    load_rgb = needs_rgb(args.model) and args.visual_feature_cache is None
 
     train_loader = make_loader(args, "train", load_rgb)
     val_loader = make_loader(args, "val", load_rgb)
@@ -277,6 +282,8 @@ def main() -> None:
 
     config = vars(args).copy()
     config["dataset"] = args.dataset.as_posix()
+    if args.visual_feature_cache is not None:
+        config["visual_feature_cache"] = args.visual_feature_cache.as_posix()
     config["output_dir"] = args.output_dir.as_posix()
     config["device"] = str(device)
     config["resolved_trajectory_scale"] = trajectory_scale

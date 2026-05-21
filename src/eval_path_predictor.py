@@ -16,6 +16,7 @@ from .train_path_predictor import evaluate_loader, make_loader
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate a WIT-VZ path predictor.")
     parser.add_argument("--dataset", type=Path, required=True)
+    parser.add_argument("--visual-feature-cache", type=Path, default=None)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--split", default="test", choices=["train", "val", "test"])
@@ -37,6 +38,9 @@ def main() -> None:
     device = choose_device(args.device)
     checkpoint = torch.load(args.checkpoint, map_location=device)
     model_name = checkpoint["model_name"]
+    visual_feature_cache = args.visual_feature_cache
+    if visual_feature_cache is None and checkpoint.get("visual_feature_cache"):
+        visual_feature_cache = Path(str(checkpoint["visual_feature_cache"]))
     model = create_model(
         model_name,
         future_steps=int(checkpoint["future_steps"]),
@@ -60,11 +64,12 @@ def main() -> None:
 
     loader_args = SimpleNamespace(
         dataset=args.dataset,
+        visual_feature_cache=visual_feature_cache,
         image_size=int(checkpoint.get("image_size", 64)),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
     )
-    loader = make_loader(loader_args, args.split, needs_rgb(model_name))
+    loader = make_loader(loader_args, args.split, needs_rgb(model_name) and visual_feature_cache is None)
     metrics, predictions = evaluate_loader(
         model,
         loader,

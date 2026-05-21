@@ -673,7 +673,10 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
         )
 
     def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor | dict[str, torch.Tensor]:
-        tokens = self.visual_encoder(batch["rgb_history"])
+        if "visual_tokens" in batch:
+            tokens = batch["visual_tokens"].float()
+        else:
+            tokens = self.visual_encoder(batch["rgb_history"])
         tokens = self.input_projection(tokens)
         tokens = self.spatial_position(tokens)
         tokens = self.adapter(tokens)

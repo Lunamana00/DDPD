@@ -22,7 +22,8 @@ Fast demo setup:
 If the scene does not already contain a `PathPredictionClient`, the bootstrap
 script creates a complete demo setup automatically:
 
-- floor, walls, grid, obstacles, and a green reference route
+- high-contrast floor, walls, grid, obstacles, and a green reference route
+- colored wall panels, floor bands, beacons, crates, and decision gates
 - moving capsule agent
 - first-person camera
 - directional light
@@ -30,6 +31,9 @@ script creates a complete demo setup automatically:
 
 The client starts in `Demo Mode`, so it draws a local constant-velocity path
 from recent motion history without the GPU server.
+
+The visual cues are intentionally high contrast. They are there so the camera
+stream contains route-relevant information instead of a blank corridor.
 
 GPU server setup:
 

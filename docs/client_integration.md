@@ -70,8 +70,11 @@ Fastest path:
 1. Open any empty scene.
 2. Press Play.
 
-The bootstrap script creates the floor, corridor walls, grid, obstacles,
-reference route, moving agent, camera, light, and prediction visualizer.
+The bootstrap script creates a high-contrast visual test scene: floor bands,
+colored wall panels, beacons, crates, decision gates, corridor walls, grid,
+obstacles, reference route, moving agent, camera, light, and prediction
+visualizer. The goal is to make the camera stream contain cues that a visual
+model can plausibly use, not just a blank corridor.
 
 Manual setup is also supported. Create an empty GameObject and attach:
 

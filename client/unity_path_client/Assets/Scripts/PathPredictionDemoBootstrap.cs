@@ -50,7 +50,11 @@ public static class PathPredictionDemoBootstrap
 
     private static Material CreateMaterial(Color color)
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
+        Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+        if (shader == null)
+        {
+            shader = Shader.Find("Unlit/Color");
+        }
         if (shader == null)
         {
             shader = Shader.Find("Standard");

@@ -11,14 +11,16 @@ from pathlib import Path
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run path-prediction horizon sweep.")
-    parser.add_argument("--raw", type=Path, default=Path("data/wit_vz/raw/wit_vz_basic_10s"))
+    parser.add_argument("--raw", type=Path, nargs="+", default=[Path("data/wit_vz/raw/wit_vz_basic_10s")])
     parser.add_argument("--processed-root", type=Path, default=Path("data/wit_vz/processed/horizon_sweep"))
     parser.add_argument("--runs-root", type=Path, default=Path("runs/horizon_sweep"))
+    parser.add_argument("--horizons", type=int, nargs="+", default=None)
     parser.add_argument("--min-sec", type=int, default=1)
     parser.add_argument("--max-sec", type=int, default=10)
     parser.add_argument("--history-sec", type=float, default=1.0)
     parser.add_argument("--sample-fps", type=float, default=5.0)
     parser.add_argument("--stride", type=int, default=2)
+    parser.add_argument("--split", choices=["episode", "map", "source"], default="episode")
     parser.add_argument("--epochs", type=int, default=8)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--hidden-dim", type=int, default=64)
@@ -34,13 +36,18 @@ def run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)
 
 
+def horizon_label(horizon_sec: int) -> str:
+    return f"future_{horizon_sec:02d}s"
+
+
 def main() -> None:
     args = parse_args()
     args.processed_root.mkdir(parents=True, exist_ok=True)
     args.runs_root.mkdir(parents=True, exist_ok=True)
     rows = []
-    for horizon_sec in range(args.min_sec, args.max_sec + 1):
-        dataset_dir = args.processed_root / f"future_{horizon_sec:02d}s"
+    horizons = args.horizons if args.horizons is not None else list(range(args.min_sec, args.max_sec + 1))
+    for horizon_sec in horizons:
+        dataset_dir = args.processed_root / horizon_label(horizon_sec)
         if not args.summarize_only:
             run(
                 [
@@ -48,7 +55,7 @@ def main() -> None:
                     "-m",
                     "src.wit_vz.build_samples",
                     "--raw",
-                    str(args.raw),
+                    *[str(path) for path in args.raw],
                     "--out",
                     str(dataset_dir),
                     "--history-sec",
@@ -61,6 +68,8 @@ def main() -> None:
                     str(args.stride),
                     "--seed",
                     str(args.seed),
+                    "--split",
+                    args.split,
                     "--preview-count",
                     "0",
                 ]
@@ -160,24 +169,44 @@ def main() -> None:
 
     summary_path = args.runs_root / "horizon_summary.json"
     summary_path.write_text(json.dumps(rows, indent=2), encoding="utf-8")
-    markdown = [
-        "# Horizon Sweep",
-        "",
-        "| Horizon | Samples | Steps | CV ADE | CV FDE | Model ADE | Model FDE |",
-        "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
-    ]
-    for row in rows:
-        markdown.append(
-            "| {horizon}s | {samples} | {steps} | {cv_ade:.4f} | {cv_fde:.4f} | {model_ade:.4f} | {model_fde:.4f} |".format(
-                horizon=row["horizon_sec"],
-                samples=row["num_samples"],
-                steps=row.get("future_steps", 0),
-                cv_ade=row.get("cv_ADE", float("nan")),
-                cv_fde=row.get("cv_FDE", float("nan")),
-                model_ade=row.get("model_ADE", float("nan")),
-                model_fde=row.get("model_FDE", float("nan")),
-            )
+    has_model = any("model_ADE" in row for row in rows)
+    markdown = ["# Horizon Sweep", ""]
+    if has_model:
+        markdown.extend(
+            [
+                "| Horizon | Samples | Steps | CV ADE | CV FDE | Model ADE | Model FDE |",
+                "| ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
         )
+    else:
+        markdown.extend(
+            [
+                "| Horizon | Samples | Steps | CV ADE | CV FDE |",
+                "| ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
+    for row in rows:
+        values = {
+            "horizon": row["horizon_sec"],
+            "samples": row["num_samples"],
+            "steps": row.get("future_steps", 0),
+            "cv_ade": row.get("cv_ADE", float("nan")),
+            "cv_fde": row.get("cv_FDE", float("nan")),
+            "model_ade": row.get("model_ADE", float("nan")),
+            "model_fde": row.get("model_FDE", float("nan")),
+        }
+        if has_model:
+            markdown.append(
+                "| {horizon}s | {samples} | {steps} | {cv_ade:.4f} | {cv_fde:.4f} | {model_ade:.4f} | {model_fde:.4f} |".format(
+                    **values
+                )
+            )
+        else:
+            markdown.append(
+                "| {horizon}s | {samples} | {steps} | {cv_ade:.4f} | {cv_fde:.4f} |".format(
+                    **values
+                )
+            )
     report_path = args.runs_root / "horizon_summary.md"
     report_path.write_text("\n".join(markdown) + "\n", encoding="utf-8")
     print(f"wrote {summary_path}")

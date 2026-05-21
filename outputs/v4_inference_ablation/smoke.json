@@ -1,0 +1,275 @@
+{
+  "evaluation_type": "inference_time_ablation",
+  "note": "No retraining, no DVC pull, no downloads, no new data collection.",
+  "split": "test",
+  "limit": 256,
+  "batch_size": 256,
+  "device": "cuda",
+  "ablations": {
+    "constant_velocity": "No visual model; extrapolates recent ego-motion linearly.",
+    "full_model": "Original trained checkpoint inference path.",
+    "zero_visual_tokens": "Sets all cached visual tokens to zero before the model.",
+    "static_visual_tokens": "Repeats the last frame token grid across the whole history.",
+    "no_temporal_adapter": "Skips the TimeSFormer-style temporal/spatial fusion adapter.",
+    "uniform_selector": "Replaces adaptive TokenLearner cues with repeated spatial means.",
+    "no_cue_temporal": "Skips temporal modeling over selected cue tokens.",
+    "no_memory_update": "Bypasses the cue memory bank and decodes from the last cue set.",
+    "no_ego_memory": "Zeros ego-motion only inside memory updates; keeps the final CV base intact."
+  },
+  "horizons": [
+    {
+      "horizon_sec": 1,
+      "future_steps": 5,
+      "dataset": "data/wit_vz/processed/wit_vz_v4_defaults_001",
+      "checkpoint": "checkpoints/wit_vz_v4_defaults_dinov3_single_01s.pt",
+      "samples": 256,
+      "metrics": {
+        "constant_velocity": {
+          "samples": 256,
+          "ADE": 36.97248458862305,
+          "FDE": 56.50697326660156,
+          "per_step_error": [
+            14.999849319458008,
+            27.4935302734375,
+            38.21044921875,
+            47.651611328125,
+            56.50697326660156
+          ],
+          "prediction_shape": [
+            256,
+            5,
+            2
+          ]
+        },
+        "full_model": {
+          "samples": 256,
+          "ADE": 30.335248947143555,
+          "FDE": 46.04324722290039,
+          "per_step_error": [
+            11.6920166015625,
+            22.54255485534668,
+            31.775386810302734,
+            39.623023986816406,
+            46.04324722290039
+          ],
+          "prediction_shape": [
+            256,
+            5,
+            2
+          ]
+        },
+        "zero_visual_tokens": {
+          "samples": 256,
+          "ADE": 36.30574417114258,
+          "FDE": 56.494022369384766,
+          "per_step_error": [
+            13.618673324584961,
+            26.33415412902832,
+            37.56751251220703,
+            47.514373779296875,
+            56.494022369384766
+          ],
+          "prediction_shape": [
+            256,
+            5,
+            2
+          ]
+        },
+        "static_visual_tokens": {
+          "samples": 256,
+          "ADE": 30.343738555908203,
+          "FDE": 45.77484130859375,
+          "per_step_error": [
+            11.87990951538086,
+            22.890249252319336,
+            31.842300415039062,
+            39.331382751464844,
+            45.77484130859375
+          ],
+          "prediction_shape": [
+            256,
+            5,
+            2
+          ]
+        },
+        "no_temporal_adapter": {
+          "samples": 256,
+          "ADE": 31.82967185974121,
+          "FDE": 48.97050094604492,
+          "per_step_error": [
+            12.033097267150879,
+            23.228261947631836,
+            33.20148849487305,
+            41.71501159667969,
+            48.97050094604492
+          ],
+          "prediction_shape": [
+            256,
+            5,
+            2
+          ]
+        },
+        "uniform_selector": {
+          "samples": 256,
+          "ADE": 30.261062622070312,
+          "FDE": 45.6296501159668,
+          "per_step_error": [
+            11.715835571289062,
+            22.54546356201172,
+            31.839275360107422,
+            39.57509231567383,
+            45.6296501159668
+          ],
+          "prediction_shape": [
+            256,
+            5,
+            2
+          ]
+        },
+        "no_cue_temporal": {
+          "samples": 256,
+          "ADE": 31.21067237854004,
+          "FDE": 47.20842742919922,
+          "per_step_error": [
+            12.211029052734375,
+            23.20990753173828,
+            32.73991775512695,
+            40.68408203125,
+            47.20842742919922
+          ],
+          "prediction_shape": [
+            256,
+            5,
+            2
+          ]
+        },
+        "no_memory_update": {
+          "samples": 256,
+          "ADE": 86.25901794433594,
+          "FDE": 132.15249633789062,
+          "per_step_error": [
+            23.920188903808594,
+            60.356441497802734,
+            95.40461730957031,
+            119.46131134033203,
+            132.15249633789062
+          ],
+          "prediction_shape": [
+            256,
+            5,
+            2
+          ]
+        },
+        "no_ego_memory": {
+          "samples": 256,
+          "ADE": 34.35124969482422,
+          "FDE": 52.132389068603516,
+          "per_step_error": [
+            14.154966354370117,
+            25.725177764892578,
+            35.61526107788086,
+            44.128440856933594,
+            52.132389068603516
+          ],
+          "prediction_shape": [
+            256,
+            5,
+            2
+          ]
+        }
+      },
+      "impact_ranked_by_ADE": [
+        {
+          "ablation": "no_memory_update",
+          "delta_ADE_vs_full": 55.92376899719238,
+          "delta_FDE_vs_full": 86.10924911499023,
+          "relative_ADE_vs_full_pct": 184.35243137326657,
+          "relative_FDE_vs_full_pct": 187.0181933479321
+        },
+        {
+          "ablation": "constant_velocity",
+          "delta_ADE_vs_full": 6.637235641479492,
+          "delta_FDE_vs_full": 10.463726043701172,
+          "relative_ADE_vs_full_pct": 21.87961487655592,
+          "relative_FDE_vs_full_pct": 22.725864648609885
+        },
+        {
+          "ablation": "zero_visual_tokens",
+          "delta_ADE_vs_full": 5.970495223999023,
+          "delta_FDE_vs_full": 10.450775146484375,
+          "relative_ADE_vs_full_pct": 19.681708346623683,
+          "relative_FDE_vs_full_pct": 22.697736968661285
+        },
+        {
+          "ablation": "no_ego_memory",
+          "delta_ADE_vs_full": 4.016000747680664,
+          "delta_FDE_vs_full": 6.089141845703125,
+          "relative_ADE_vs_full_pct": 13.238726850991679,
+          "relative_FDE_vs_full_pct": 13.224831463829911
+        },
+        {
+          "ablation": "no_temporal_adapter",
+          "delta_ADE_vs_full": 1.4944229125976562,
+          "delta_FDE_vs_full": 2.9272537231445312,
+          "relative_ADE_vs_full_pct": 4.926357832769246,
+          "relative_FDE_vs_full_pct": 6.357617891225997
+        },
+        {
+          "ablation": "no_cue_temporal",
+          "delta_ADE_vs_full": 0.8754234313964844,
+          "delta_FDE_vs_full": 1.1651802062988281,
+          "relative_ADE_vs_full_pct": 2.8858290661198494,
+          "relative_FDE_vs_full_pct": 2.5306212671275308
+        },
+        {
+          "ablation": "static_visual_tokens",
+          "delta_ADE_vs_full": 0.008489608764648438,
+          "delta_FDE_vs_full": -0.2684059143066406,
+          "relative_ADE_vs_full_pct": 0.027985953830289567,
+          "relative_FDE_vs_full_pct": -0.5829430600480023
+        },
+        {
+          "ablation": "full_model",
+          "delta_ADE_vs_full": 0.0,
+          "delta_FDE_vs_full": 0.0,
+          "relative_ADE_vs_full_pct": 0.0,
+          "relative_FDE_vs_full_pct": 0.0
+        },
+        {
+          "ablation": "uniform_selector",
+          "delta_ADE_vs_full": -0.07418632507324219,
+          "delta_FDE_vs_full": -0.41359710693359375,
+          "relative_ADE_vs_full_pct": -0.24455485828550616,
+          "relative_FDE_vs_full_pct": -0.8982796216160049
+        }
+      ],
+      "dino_on_off_summary": {
+        "dino_on": {
+          "case": "full_model",
+          "ADE": 30.335248947143555,
+          "FDE": 46.04324722290039
+        },
+        "dino_off_ego_only": {
+          "case": "constant_velocity",
+          "meaning": "No DINO, no visual model; ego-motion-only extrapolation.",
+          "ADE": 36.97248458862305,
+          "FDE": 56.50697326660156,
+          "delta_ADE_vs_dino_on": 6.637235641479492,
+          "delta_FDE_vs_dino_on": 10.463726043701172,
+          "relative_ADE_vs_dino_on_pct": 21.87961487655592,
+          "relative_FDE_vs_dino_on_pct": 22.725864648609885
+        },
+        "dino_signal_off_same_checkpoint": {
+          "case": "zero_visual_tokens",
+          "meaning": "Same trained model, but cached DINO tokens are replaced by zeros at inference.",
+          "ADE": 36.30574417114258,
+          "FDE": 56.494022369384766,
+          "delta_ADE_vs_dino_on": 5.970495223999023,
+          "delta_FDE_vs_dino_on": 10.450775146484375,
+          "relative_ADE_vs_dino_on_pct": 19.681708346623683,
+          "relative_FDE_vs_dino_on_pct": 22.697736968661285
+        }
+      }
+    }
+  ]
+}

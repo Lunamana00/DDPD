@@ -65,6 +65,9 @@ client/**/sysinfo.txt
 *.pt
 *.pth
 *.ckpt
+!checkpoints/
+!checkpoints/*.pt
+!checkpoints/README.md
 runs/**/predictions.jsonl
 runs/cue_memory_arch_v2_multimodal*/
 runs/cue_memory_regularized*/

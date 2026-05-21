@@ -30,3 +30,11 @@ public class PathPredictionResponse
     public PathPoint[] path;
     public float[] mode_confidences;
 }
+
+public static class PathPredictionResponseExtensions
+{
+    public static bool HasPath(this PathPredictionResponse response)
+    {
+        return response != null && response.path != null && response.path.Length > 0;
+    }
+}

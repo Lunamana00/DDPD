@@ -65,7 +65,15 @@ Open this folder in Unity:
 client/unity_path_client
 ```
 
-Create an empty GameObject and attach:
+Fastest path:
+
+1. Open any empty scene.
+2. Press Play.
+
+The bootstrap script creates the floor, corridor walls, grid, obstacles,
+reference route, moving agent, camera, light, and prediction visualizer.
+
+Manual setup is also supported. Create an empty GameObject and attach:
 
 ```text
 Assets/Scripts/PathPredictionClient.cs
@@ -75,12 +83,14 @@ Assign:
 
 - `Agent Root`: the player/camera rig transform
 - `Source Camera`: the camera used for RGB capture
-- `Predicted Path Line`: a `LineRenderer`
 - `Server URL`: `http://GPU_SERVER_IP:8000/predict`
 
-For initial connectivity testing, leave `Send RGB Frames` disabled and use a
-constant-velocity or ego-motion-only checkpoint. For the actual visual path
-model, enable `Send RGB Frames`.
+The client auto-creates `PathPredictionVisualizer`, `LineRenderer`, and waypoint
+markers. For initial visualization testing, keep `Demo Mode` enabled; it draws a
+local constant-velocity path without calling the server. For server testing,
+disable `Demo Mode`, leave `Fallback To Local Motion` enabled, and use a
+constant-velocity or ego-motion-only checkpoint first. For the actual visual
+path model, enable `Send RGB Frames`.
 
 ## Network Notes
 

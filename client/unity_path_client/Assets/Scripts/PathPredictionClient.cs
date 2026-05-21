@@ -15,12 +15,15 @@ public class PathPredictionClient : MonoBehaviour
     [Header("Scene")]
     [SerializeField] private Transform agentRoot;
     [SerializeField] private Camera sourceCamera;
-    [SerializeField] private LineRenderer predictedPathLine;
+    [SerializeField] private PathPredictionVisualizer visualizer;
 
     [Header("History")]
     [SerializeField] private int historyLength = 5;
     [SerializeField] private bool sendRgbFrames = false;
     [SerializeField] private int captureSize = 128;
+    [SerializeField] private bool demoMode = true;
+    [SerializeField] private bool fallbackToLocalMotion = true;
+    [SerializeField] private float stationaryDemoStep = 0.75f;
 
     [Header("Rendering")]
     [SerializeField] private float pathHeight = 0.05f;
@@ -34,11 +37,31 @@ public class PathPredictionClient : MonoBehaviour
     private bool requestInFlight;
     private float nextRequestTime;
 
+    public void ConfigureRuntime(
+        Transform root,
+        Camera camera,
+        PathPredictionVisualizer pathVisualizer,
+        string predictionServerUrl,
+        bool useDemoMode
+    )
+    {
+        agentRoot = root != null ? root : transform;
+        sourceCamera = camera;
+        visualizer = pathVisualizer != null ? pathVisualizer : GetComponent<PathPredictionVisualizer>();
+        serverUrl = string.IsNullOrWhiteSpace(predictionServerUrl) ? serverUrl : predictionServerUrl;
+        demoMode = useDemoMode;
+        if (visualizer == null)
+        {
+            visualizer = gameObject.AddComponent<PathPredictionVisualizer>();
+        }
+        visualizer.Configure(agentRoot, pathScale, pathHeight);
+    }
+
     private void Reset()
     {
         agentRoot = transform;
         sourceCamera = Camera.main;
-        predictedPathLine = GetComponent<LineRenderer>();
+        visualizer = GetComponent<PathPredictionVisualizer>();
     }
 
     private void Awake()
@@ -47,6 +70,15 @@ public class PathPredictionClient : MonoBehaviour
         {
             agentRoot = transform;
         }
+        if (visualizer == null)
+        {
+            visualizer = GetComponent<PathPredictionVisualizer>();
+        }
+        if (visualizer == null)
+        {
+            visualizer = gameObject.AddComponent<PathPredictionVisualizer>();
+        }
+        visualizer.Configure(agentRoot, pathScale, pathHeight);
     }
 
     private void Update()
@@ -60,7 +92,14 @@ public class PathPredictionClient : MonoBehaviour
         if (!requestInFlight && Time.time >= nextRequestTime && egoHistory.Count >= historyLength)
         {
             nextRequestTime = Time.time + requestIntervalSeconds;
-            StartCoroutine(RequestPrediction());
+            if (demoMode)
+            {
+                RenderPath(BuildLocalMotionPrediction());
+            }
+            else
+            {
+                StartCoroutine(RequestPrediction());
+            }
         }
     }
 
@@ -112,6 +151,10 @@ public class PathPredictionClient : MonoBehaviour
             else
             {
                 Debug.LogWarning($"Path prediction request failed: {request.error}");
+                if (fallbackToLocalMotion)
+                {
+                    RenderPath(BuildLocalMotionPrediction());
+                }
             }
         }
 
@@ -164,22 +207,58 @@ public class PathPredictionClient : MonoBehaviour
 
     private void RenderPath(PathPredictionResponse response)
     {
-        if (predictedPathLine == null || response == null || response.path == null)
+        if (visualizer == null)
         {
             return;
         }
 
-        predictedPathLine.positionCount = response.path.Length;
-        for (int i = 0; i < response.path.Length; i++)
+        visualizer.Configure(agentRoot, pathScale, pathHeight);
+        visualizer.Render(response);
+    }
+
+    private PathPredictionResponse BuildLocalMotionPrediction()
+    {
+        Vector2 velocity = AverageRecentLocalVelocity();
+        if (velocity.sqrMagnitude < 0.0001f)
         {
-            PathPoint point = response.path[i];
-            Vector3 local = new Vector3(
-                point.right * pathScale,
-                pathHeight,
-                point.forward * pathScale
-            );
-            predictedPathLine.SetPosition(i, agentRoot.TransformPoint(local));
+            velocity = new Vector2(stationaryDemoStep, 0.0f);
         }
+        PathPoint[] path = new PathPoint[historyLength];
+        for (int i = 0; i < path.Length; i++)
+        {
+            float step = i + 1;
+            path[i] = new PathPoint
+            {
+                forward = velocity.x * step,
+                right = velocity.y * step
+            };
+        }
+
+        return new PathPredictionResponse
+        {
+            future_steps = path.Length,
+            selected_mode = 0,
+            path = path,
+            mode_confidences = new[] { 1.0f }
+        };
+    }
+
+    private Vector2 AverageRecentLocalVelocity()
+    {
+        if (egoHistory.Count == 0)
+        {
+            return Vector2.zero;
+        }
+
+        float forward = 0.0f;
+        float right = 0.0f;
+        foreach (EgoMotionSample sample in egoHistory)
+        {
+            forward += sample.forward;
+            right += sample.right;
+        }
+        float count = egoHistory.Count;
+        return new Vector2(forward / count, right / count);
     }
 
     private string CaptureCameraPngBase64()

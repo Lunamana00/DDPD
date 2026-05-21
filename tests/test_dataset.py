@@ -5,7 +5,7 @@ from PIL import Image
 
 import torch
 
-from src.wit_vz.dataset import WITVZPathDataset, collate_path_batch
+from src.wit_vz.dataset import WITVZPathDataset, collate_path_batch, sample_group_key
 
 
 def write_json(path: Path, data):
@@ -52,7 +52,13 @@ def test_processed_dataset_sample_shapes(tmp_path):
                 "future_local_path": [[1, 0], [2, 0]],
                 "future_world_path": [{"x": 1, "y": 0}, {"x": 2, "y": 0}],
                 "current_pose": {"x": 0, "y": 0, "angle": 0},
-                "metadata": {},
+                "metadata": {
+                    "env_name": "vizdoom",
+                    "source_id": "source_a",
+                    "scenario": "deadly_corridor",
+                    "map_id": "map01",
+                    "policy": "corridor",
+                },
             }
         ],
     )
@@ -61,6 +67,10 @@ def test_processed_dataset_sample_shapes(tmp_path):
     assert item["rgb_history"].shape == (3, 3, 16, 16)
     assert item["ego_history"].shape == (3, 3)
     assert item["future_path"].shape == (2, 2)
+    assert item["balance"]["source"] == "source_a"
+    assert item["balance"]["scenario"] == "vizdoom::deadly_corridor"
+    assert item["balance"]["source_policy"] == "source_a::corridor"
+    assert sample_group_key(dataset.samples[0], "policy") == "corridor"
 
     cache = tmp_path / "feature_cache"
     feature_dir = cache / "features"
@@ -80,6 +90,7 @@ def test_processed_dataset_sample_shapes(tmp_path):
 
     batch = collate_path_batch([cached_item, cached_item])
     assert batch["visual_tokens"].shape == (2, 3, 4, 8)
+    assert batch["balance"][0]["policy"] == "corridor"
 
 
 def test_processed_dataset_resolves_source_prefixed_raw_paths(tmp_path):

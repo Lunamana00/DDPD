@@ -66,7 +66,7 @@ Lower is better.
 - DINOv3 is generally stronger than small-CNN, especially at 1, 3, 5, and 30 seconds.
 - The 10-second ADE exception favors small-CNN, while 10-second FDE still favors DINOv3 STRNet. This suggests the models differ in average-path fit versus endpoint fit.
 - STRNet is not uniformly better than TimeSFormer. It helps most clearly at 3-second ADE/FDE and 5/10-second FDE.
-- Long-horizon deterministic ADE/FDE is harsh. At 10 and 30 seconds, multiple future paths can be plausible, so the next metric upgrade should add multi-modal `minADE`, `minFDE`, and mode confidence.
+- Long-horizon deterministic ADE/FDE is harsh. At 10 and 30 seconds, route uncertainty grows, so these results should be interpreted with horizon-specific endpoint and curvature diagnostics.
 
 ## Practical Interpretation
 
@@ -78,4 +78,4 @@ For a single deterministic path predictor, the current strongest default is:
 - 10s: small-CNN for ADE, DINOv3 STRNet for FDE
 - 30s: DINOv3 TimeSFormer
 
-The robust next step is a multi-horizon or multi-modal model instead of training separate deterministic heads for every horizon.
+The robust next step is a multi-horizon deterministic model instead of training separate heads for every horizon.

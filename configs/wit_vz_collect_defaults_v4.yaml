@@ -1,0 +1,168 @@
+runs:
+  - scenario: basic
+    map: map01
+    run_id: wit_vz_v4_default_basic_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: random_walk
+    seed: 402
+  - scenario: basic_audio
+    map: map01
+    run_id: wit_vz_v4_default_basic_audio_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: random_walk
+    seed: 403
+  - scenario: basic_notifications
+    map: map01
+    run_id: wit_vz_v4_default_basic_notifications_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: random_walk
+    seed: 404
+  - scenario: deadly_corridor
+    map: map01
+    run_id: wit_vz_v4_default_deadly_corridor_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 405
+  - scenario: deathmatch
+    map: map01
+    run_id: wit_vz_v4_default_deathmatch_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 406
+  - scenario: defend_the_center
+    map: map01
+    run_id: wit_vz_v4_default_defend_the_center_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 407
+  - scenario: defend_the_line
+    map: map01
+    run_id: wit_vz_v4_default_defend_the_line_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 408
+  - scenario: health_gathering
+    map: map01
+    run_id: wit_vz_v4_default_health_gathering_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 409
+  - scenario: health_gathering_supreme
+    map: map01
+    run_id: wit_vz_v4_default_health_gathering_supreme_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 410
+  - scenario: multi_deathmatch
+    map: map01
+    run_id: wit_vz_v4_default_multi_deathmatch_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 411
+  - scenario: my_way_home
+    map: map01
+    run_id: wit_vz_v4_default_my_way_home_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 412
+  - scenario: predict_position
+    map: map01
+    run_id: wit_vz_v4_default_predict_position_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 413
+  - scenario: rocket_basic
+    map: map01
+    run_id: wit_vz_v4_default_rocket_basic_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: random_walk
+    seed: 414
+  - scenario: simpler_basic
+    map: map01
+    run_id: wit_vz_v4_default_simpler_basic_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: random_walk
+    seed: 415
+  - scenario: take_cover
+    map: map01
+    run_id: wit_vz_v4_default_take_cover_001
+    episodes: 40
+    max_steps: 300
+    frame_skip: 4
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 25
+    seed: 416
+skipped_after_smoke:
+  - scenario: cig
+    reason: ViZDoom segfaults during initialization in this environment.
+  - scenario: cig_with_unknown
+    reason: ViZDoom segfaults during initialization in this environment.
+  - scenario: multi_duel
+    reason: ViZDoom segfaults during initialization in this environment.

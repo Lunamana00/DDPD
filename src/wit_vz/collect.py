@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import random
 import shutil
 import time
@@ -73,7 +74,41 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--frame-skip", type=int, default=4)
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--mode", choices=["scripted", "human"], default="scripted")
-    parser.add_argument("--policy", choices=["corridor", "random"], default="corridor")
+    parser.add_argument(
+        "--policy",
+        choices=[
+            "corridor",
+            "random",
+            "random_walk",
+            "noisy_corridor",
+            "goal_directed",
+            "obstacle_avoidance",
+            "mixed",
+        ],
+        default="corridor",
+    )
+    parser.add_argument(
+        "--policy-mix",
+        nargs="+",
+        default=["corridor", "random_walk", "noisy_corridor", "goal_directed", "obstacle_avoidance"],
+        choices=["corridor", "random", "random_walk", "noisy_corridor", "goal_directed", "obstacle_avoidance"],
+        help="Episode-level policy choices used when --policy mixed.",
+    )
+    parser.add_argument("--policy-noise", type=float, default=0.05)
+    parser.add_argument("--goal-x", type=float, default=None)
+    parser.add_argument("--goal-y", type=float, default=None)
+    parser.add_argument(
+        "--start-random-steps",
+        type=int,
+        default=0,
+        help="Random warmup actions before recording each episode to diversify the initial pose.",
+    )
+    parser.add_argument(
+        "--start-random-jitter",
+        type=int,
+        default=0,
+        help="Additional random warmup steps sampled uniformly from [0, jitter].",
+    )
     parser.add_argument("--player-id", default=None, help="Optional anonymized player id for human sessions.")
     parser.add_argument("--session-id", default=None, help="Optional human recording session id.")
     parser.add_argument(
@@ -139,6 +174,10 @@ def build_game(args: argparse.Namespace) -> tuple[Any, dict[str, Any]]:
     game.set_doom_scenario_path(scenario_path(vzd, args.scenario))
     game.set_doom_map(args.map)
     game.set_window_visible(bool(args.visible or args.mode == "human"))
+    if hasattr(game, "set_sound_enabled"):
+        game.set_sound_enabled(False)
+    if hasattr(game, "set_music_enabled"):
+        game.set_music_enabled(False)
     game.set_screen_resolution(get_screen_resolution(vzd, args.screen_width, args.screen_height))
     game.set_screen_format(vzd.ScreenFormat.RGB24)
     game.set_depth_buffer_enabled(bool(args.save_depth))
@@ -179,11 +218,86 @@ def build_game(args: argparse.Namespace) -> tuple[Any, dict[str, Any]]:
     }
 
 
-def choose_scripted_action(rng: random.Random, policy: str, step: int) -> tuple[int, str, list[int]]:
+def _angle_delta_degrees(target: float, current: float) -> float:
+    return (target - current + 180.0) % 360.0 - 180.0
+
+
+def _default_goal_for_episode(episode_index: int) -> tuple[float, float]:
+    goals = [
+        (384.0, 0.0),
+        (-384.0, 0.0),
+        (0.0, 384.0),
+        (0.0, -384.0),
+        (256.0, 256.0),
+        (-256.0, -256.0),
+    ]
+    return goals[(episode_index - 1) % len(goals)]
+
+
+def _maybe_noisy_action(rng: random.Random, policy_noise: float) -> tuple[int, str, list[int]] | None:
+    if policy_noise > 0.0 and rng.random() < policy_noise:
+        action_id = rng.randrange(len(ACTION_SPACE))
+        name, vector = ACTION_SPACE[action_id]
+        return action_id, name, vector
+    return None
+
+
+def choose_scripted_action(
+    rng: random.Random,
+    policy: str,
+    step: int,
+    pose: dict[str, float] | None = None,
+    goal: tuple[float, float] | None = None,
+    policy_noise: float = 0.0,
+) -> tuple[int, str, list[int]]:
+    noisy = _maybe_noisy_action(rng, policy_noise)
+    if noisy is not None:
+        action_id, name, vector = noisy
+        return action_id, f"{name}[noise]", vector
+
     if policy == "random":
         action_id = rng.randrange(len(ACTION_SPACE))
         name, vector = ACTION_SPACE[action_id]
         return action_id, name, vector
+
+    if policy == "random_walk":
+        action_id = rng.choice([0, 1, 3, 4, 6, 7, 8, 9, 10, 18])
+        name, vector = ACTION_SPACE[action_id]
+        return action_id, name, vector
+
+    if policy == "goal_directed" and pose is not None and goal is not None:
+        dx = goal[0] - float(pose.get("x", 0.0))
+        dy = goal[1] - float(pose.get("y", 0.0))
+        target_angle = math.degrees(math.atan2(dy, dx))
+        delta = _angle_delta_degrees(target_angle, float(pose.get("angle", 0.0)))
+        if abs(delta) > 55.0:
+            action_id = 5 if delta > 0.0 else 4
+        elif abs(delta) > 18.0:
+            action_id = 9 if delta > 0.0 else 10
+        else:
+            action_id = rng.choice([8, 11, 14])
+        name, vector = ACTION_SPACE[action_id]
+        return action_id, f"{name}[goal_directed]", vector
+
+    if policy == "obstacle_avoidance":
+        phase = step % 24
+        if phase in {0, 1, 2}:
+            action_id = rng.choice([9, 10, 15, 16])
+        elif phase in {8, 9, 10}:
+            action_id = rng.choice([3, 4, 6, 7])
+        elif rng.random() < 0.12:
+            action_id = rng.choice([0, 1, 17, 18])
+        else:
+            action_id = rng.choice([8, 9, 10, 11, 14])
+        name, vector = ACTION_SPACE[action_id]
+        return action_id, f"{name}[obstacle_avoidance]", vector
+
+    if policy == "noisy_corridor":
+        policy_noise = max(policy_noise, 0.18)
+        noisy = _maybe_noisy_action(rng, policy_noise)
+        if noisy is not None:
+            action_id, name, vector = noisy
+            return action_id, f"{name}[noise]", vector
 
     # Corridor policy: mostly moves forward, occasionally attacks, strafes, or
     # turns. The randomness is intentional so the future path target is not a
@@ -219,6 +333,9 @@ def step_environment(
     args: argparse.Namespace,
     rng: random.Random,
     step: int,
+    policy: str | None = None,
+    pose: dict[str, float] | None = None,
+    goal: tuple[float, float] | None = None,
 ) -> tuple[int | None, str, list[int], float]:
     if args.mode == "human":
         game.advance_action(args.frame_skip)
@@ -227,7 +344,14 @@ def step_environment(
         action_name = action_name_from_vector(action_vector, game_context["button_order"])
         return action_id_for_vector(action_vector), action_name, action_vector, float(game.get_last_reward())
 
-    action_id, action_name, action_vector = choose_scripted_action(rng, args.policy, step)
+    action_id, action_name, action_vector = choose_scripted_action(
+        rng,
+        policy or args.policy,
+        step,
+        pose=pose,
+        goal=goal,
+        policy_noise=args.policy_noise,
+    )
     reward = float(game.make_action(action_vector, args.frame_skip))
     return action_id, action_name, action_vector, reward
 
@@ -252,12 +376,34 @@ def collect_episode(
 ) -> tuple[list[dict[str, Any]], dict[str, Any], int]:
     episode_id = f"episode_{episode_index:06d}"
     episode_dir = run_dir / "episodes" / episode_id
+    episode_policy = args.policy
+    if args.policy == "mixed":
+        episode_policy = rng.choice(args.policy_mix)
+    episode_goal = None
+    if args.goal_x is not None and args.goal_y is not None:
+        episode_goal = (float(args.goal_x), float(args.goal_y))
+    elif episode_policy == "goal_directed":
+        episode_goal = _default_goal_for_episode(episode_index)
     records: list[dict[str, Any]] = []
     total_reward = 0.0
     global_step = global_step_start
     prev_pose = None
 
     game.new_episode()
+    warmup_steps = max(0, args.start_random_steps)
+    if args.start_random_jitter > 0:
+        warmup_steps += rng.randrange(args.start_random_jitter + 1)
+    for warmup_step in range(warmup_steps):
+        if game.is_episode_finished():
+            break
+        _action_id, _action_name, action_vector = choose_scripted_action(
+            rng,
+            "random_walk",
+            warmup_step,
+            policy_noise=max(args.policy_noise, 0.15),
+        )
+        game.make_action(action_vector, args.frame_skip)
+
     step = 0
     while not game.is_episode_finished() and step < args.max_steps:
         state = game.get_state()
@@ -304,6 +450,9 @@ def collect_episode(
             args,
             rng,
             step,
+            policy=episode_policy,
+            pose=pose,
+            goal=episode_goal,
         )
         done = bool(game.is_episode_finished())
         total_reward += reward
@@ -326,6 +475,7 @@ def collect_episode(
                     "action_name": action_name,
                     "action_vector": action_vector,
                     "button_order": game_context["button_order"],
+                    "policy": episode_policy,
                 },
                 "reward": reward,
                 "done": done,
@@ -341,6 +491,9 @@ def collect_episode(
         "episode_id": episode_id,
         "num_steps": len(records),
         "total_reward": total_reward,
+        "policy": episode_policy,
+        "goal": {"x": episode_goal[0], "y": episode_goal[1]} if episode_goal else None,
+        "warmup_steps": warmup_steps,
         "start_pose": records[0]["pose"] if records else None,
         "final_pose": records[-1]["pose"] if records else None,
         "done": records[-1]["done"] if records else False,
@@ -405,6 +558,11 @@ def main() -> None:
         "policy": args.policy,
         "player_id": args.player_id,
         "session_id": args.session_id,
+        "policy_mix": args.policy_mix if args.policy == "mixed" else None,
+        "policy_noise": args.policy_noise,
+        "goal": {"x": args.goal_x, "y": args.goal_y} if args.goal_x is not None and args.goal_y is not None else None,
+        "start_random_steps": args.start_random_steps,
+        "start_random_jitter": args.start_random_jitter,
         "seed": args.seed,
         "episodes": [
             {

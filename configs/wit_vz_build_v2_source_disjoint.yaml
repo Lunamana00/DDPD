@@ -1,0 +1,11 @@
+raw:
+  - data/wit_vz/raw/wit_vz_v2_deadly_corridor_001
+  - data/wit_vz/raw/wit_vz_v2_health_gathering_001
+  - data/wit_vz/raw/wit_vz_v2_my_way_home_001
+out: data/wit_vz/processed/wit_vz_v2_source_disjoint_001
+history_sec: 1.0
+future_sec: 1.0
+sample_fps: 5
+stride: 1
+split: source
+seed: 211

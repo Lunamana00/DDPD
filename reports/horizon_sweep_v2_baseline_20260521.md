@@ -63,4 +63,4 @@ The earlier v2 training report compared the small-CNN cue-memory model against `
 
 The long-horizon baseline gets much worse as expected. This is useful: if visual models actually learn map structure, object cues, and route context, their improvement over constant velocity should become more visible at 3 seconds and beyond.
 
-For 10 and 30 seconds, deterministic single-path ADE/FDE will become increasingly harsh because multiple future paths may be plausible. Those horizons should eventually include multi-modal metrics such as `minADE`, `minFDE`, and mode confidence.
+For 10 and 30 seconds, deterministic single-path ADE/FDE becomes increasingly harsh because route uncertainty grows with horizon length. Those horizons should be interpreted conservatively and paired with stronger temporal modeling, richer data, and horizon-specific error breakdowns.

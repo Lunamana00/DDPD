@@ -64,3 +64,15 @@ Legacy path:
 - `memory_type=gru_cell`: per-slot recurrent GRUCell update
 
 Reference: https://arxiv.org/abs/1410.3916
+
+## Path Output Head
+
+Implemented path:
+
+- deterministic horizon-query decoder
+- outputs one future local trajectory shaped `[B, H, 2]`
+- predicts a residual over a constant-velocity motion prior
+- uses ADE/FDE in egocentric local coordinates for evaluation
+
+This is the paper-facing main model. It should be described as a single-output
+future path predictor.

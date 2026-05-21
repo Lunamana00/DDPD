@@ -1,0 +1,101 @@
+# Diverse ViZDoom collection plan for the next WIT-VZ revision.
+# my_way_home is intentionally smaller; training can also use --balance-*.
+runs:
+  - scenario: deadly_corridor
+    map: map01
+    run_id: wit_vz_v3_deadly_corridor_mixed_001
+    episodes: 80
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: mixed
+    policy_mix: [corridor, random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 20
+    save_rgb: true
+    seed: 301
+  - scenario: health_gathering
+    map: map01
+    run_id: wit_vz_v3_health_gathering_mixed_001
+    episodes: 80
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.10
+    start_random_steps: 5
+    start_random_jitter: 25
+    save_rgb: true
+    seed: 302
+  - scenario: defend_the_center
+    map: map01
+    run_id: wit_vz_v3_defend_the_center_mixed_001
+    episodes: 80
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, obstacle_avoidance]
+    policy_noise: 0.12
+    start_random_steps: 5
+    start_random_jitter: 30
+    save_rgb: true
+    seed: 303
+  - scenario: take_cover
+    map: map01
+    run_id: wit_vz_v3_take_cover_mixed_001
+    episodes: 80
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, obstacle_avoidance]
+    policy_noise: 0.14
+    start_random_steps: 5
+    start_random_jitter: 30
+    save_rgb: true
+    seed: 304
+  - scenario: predict_position
+    map: map01
+    run_id: wit_vz_v3_predict_position_mixed_001
+    episodes: 80
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, goal_directed, obstacle_avoidance]
+    policy_noise: 0.12
+    start_random_steps: 5
+    start_random_jitter: 30
+    save_rgb: true
+    seed: 305
+  - scenario: defend_the_line
+    map: map01
+    run_id: wit_vz_v3_defend_the_line_mixed_001
+    episodes: 60
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: mixed
+    policy_mix: [random_walk, noisy_corridor, obstacle_avoidance]
+    policy_noise: 0.12
+    start_random_steps: 5
+    start_random_jitter: 30
+    save_rgb: true
+    seed: 306
+  - scenario: my_way_home
+    map: map01
+    run_id: wit_vz_v3_my_way_home_reduced_001
+    episodes: 24
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: mixed
+    policy_mix: [corridor, random_walk, noisy_corridor, goal_directed]
+    policy_noise: 0.08
+    start_random_steps: 5
+    start_random_jitter: 20
+    save_rgb: true
+    seed: 307

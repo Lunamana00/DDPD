@@ -1,0 +1,25 @@
+candidate_sources:
+  - env_name: ai2thor
+    priority: 1
+    status: next_adapter
+    split: scene_disjoint
+    command_stub: uv run python -m src.external_datasets.prepare --dataset ai2thor --out data/external/ai2thor_stub --limit 100
+    reason: Fastest path to indoor embodied RGB plus controllable pose.
+  - env_name: procthor
+    priority: 2
+    status: next_adapter
+    split: house_disjoint
+    command_stub: uv run python -m src.external_datasets.prepare --dataset procthor --out data/external/procthor_stub --limit 100
+    reason: Procedural houses give strong layout diversity once AI2-THOR tooling works.
+  - env_name: habitat
+    priority: 3
+    status: asset_gated
+    split: scene_disjoint
+    command_stub: uv run python -m src.external_datasets.prepare --dataset habitat --out data/external/habitat_stub --limit 100
+    reason: Best paper-facing external validation, but requires licensed HM3D/Replica-style assets.
+  - env_name: deepmind_lab
+    priority: 4
+    status: adapter_schema_ready
+    split: level_disjoint
+    command_stub: uv run python -m src.external_datasets.prepare --dataset deepmind_lab --out data/external/deepmind_lab_stub --limit 100
+    reason: Good first-person game-domain transfer after indoor simulators.

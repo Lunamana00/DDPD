@@ -98,8 +98,8 @@ Regularization currently used in training:
 - gradient clipping `1.0`
 - early stopping in longer runs
 
-There is multi-modal head support in code, but the latest reported horizon
-comparison used deterministic single-path outputs.
+The paper-facing model should be described as a deterministic single-path
+predictor with one future trajectory output.
 
 ## Paper Alignment Notes
 
@@ -125,6 +125,98 @@ Main expanded v2 dataset:
   - `deadly_corridor`
   - `health_gathering`
   - `my_way_home`
+- Current v2 source balance is skewed: `deadly_corridor=1,138`,
+  `health_gathering=6,120`, `my_way_home=29,812` samples.
+- The dataset manifest now includes split diagnostics for source/scenario/map/
+  policy leakage checks.
+- Local strict-split v2 datasets were generated for immediate evaluation:
+  - `data/wit_vz/processed/wit_vz_v2_source_disjoint_001`
+  - `data/wit_vz/processed/wit_vz_v2_map_disjoint_001`
+
+Recent diversity/balance implementation details are in:
+
+- `reports/diversity_balance_expansion_20260521.md`
+- `reports/balanced_dinov3_training_20260521.md`
+- `reports/vizdoom_default_scenarios_dataset_20260521.md`
+- `reports/v4_dinov3_cache_training_20260521.md`
+- `reports/horizon_sweep_v4_defaults_single_output_20260521.md`
+
+New training flags:
+
+```bash
+--balance-key source --balance-mode both --balance-exponent 0.5
+```
+
+Supported balance keys include `source`, `scenario`, `map`, `policy`,
+`source_scenario`, `source_map`, and `source_policy`.
+
+New ViZDoom collection policies include `random_walk`, `noisy_corridor`,
+`goal_directed`, `obstacle_avoidance`, and episode-level `mixed` policy.
+
+GPU note for Codex on SSH:
+
+- Host GPU is healthy: `3 x RTX 3090`, NVIDIA driver `575.64.03`, PyTorch
+  `2.11.0+cu128`, CUDA runtime `12.8`.
+- Regular Codex sandbox commands do not expose `/dev/nvidia*`, so GPU checks can
+  falsely report `torch.cuda.is_available() == False`.
+- Run GPU workloads outside the sandbox/with elevated execution when needed.
+- Verified GPU smoke: CUDA tensor ops on all 3 GPUs and
+  `scripts.cache_visual_features --limit 2 --device cuda`.
+
+Latest balanced cached-DINOv3 run:
+
+- Output: `runs/wit_vz_v2_dinov3_timesformer_balanced_dp`
+- Best checkpoint: epoch `19`
+- Episode-disjoint test ADE/FDE: `10.9387 / 16.6070`
+- Source-disjoint test ADE/FDE: `8.8873 / 13.2048`
+- Map-disjoint test ADE/FDE: `14.6593 / 22.3121`
+- The training entrypoint now supports `--data-parallel` for multi-GPU
+  `torch.nn.DataParallel`.
+
+Latest data expansion:
+
+- Raw v4 default scenario runs: `data/wit_vz/raw/wit_vz_v4_default_*_001`
+- Processed v4 default dataset: `data/wit_vz/processed/wit_vz_v4_defaults_001`
+- Source-disjoint: `data/wit_vz/processed/wit_vz_v4_defaults_source_disjoint_001`
+- Map-disjoint: `data/wit_vz/processed/wit_vz_v4_defaults_map_disjoint_001`
+- Scale: `15` runnable default ViZDoom scenarios, `600` raw episodes,
+  `93,403` processed samples.
+- Skipped after smoke because ViZDoom segfaulted during init: `cig`,
+  `cig_with_unknown`, `multi_duel`.
+
+Latest v4 DINOv3 cache/training:
+
+- Cache path:
+  `data/wit_vz/feature_cache/wit_vz_v4_defaults_001_dinov3_convnext_tiny`
+- Cache scale: `93,403` tensor payload files, token shape `[5, 64, 768]`,
+  about `44G`.
+- Training output:
+  `runs/wit_vz_v4_defaults_dinov3_timesformer_balanced_dp_single_bs512`
+- Best checkpoint: epoch `10`
+- Main episode-disjoint test ADE/FDE: `26.8676 / 41.5629`
+- Source-disjoint test ADE/FDE: `25.3887 / 38.5235`
+- Map-disjoint test ADE/FDE: `22.1936 / 33.7372`
+- Final run used a single deterministic trajectory output, `batch_size=512`,
+  3-GPU DataParallel, mixed precision, and `source_policy` balancing.
+- Free disk after the horizon sweep was about `5.6G` on `/home/taehyun`; free
+  space before starting another large cache or dataset archive.
+
+Latest v4 horizon sweep:
+
+- Processed root: `data/wit_vz/processed/horizon_sweep_v4_defaults`
+- Run root: `runs/horizon_sweep_v4_defaults`
+- Visual cache reused from the v4 1s cache; missing cache files were `0` for
+  1s, 3s, 5s, and 10s.
+- 30s generated `0` samples from the current v4 raw episodes, so longer raw
+  episodes are required before training 30s prediction.
+- Single-output DINOv3 TimeSFormer vs constant velocity test metrics:
+
+| Horizon | Samples | CV ADE/FDE | Model ADE/FDE |
+| ---: | ---: | ---: | ---: |
+| 1s | 93,403 | `33.1120 / 51.4413` | `26.8676 / 41.5629` |
+| 3s | 82,848 | `75.7201 / 131.6904` | `62.1001 / 103.3531` |
+| 5s | 73,149 | `111.2669 / 202.7233` | `88.6020 / 157.0852` |
+| 10s | 52,765 | `217.1669 / 408.6508` | `154.5734 / 258.7196` |
 
 Horizon sweep datasets:
 
@@ -193,8 +285,9 @@ Takeaway:
 
 - DINOv3 usually helps versus small-CNN.
 - STRNet is useful but not uniformly better than TimeSFormer.
-- Long horizons need multi-modal metrics and probably a multi-modal output
-  head because deterministic ADE/FDE becomes harsh when many futures are valid.
+- Long horizons make deterministic ADE/FDE harsher, so future work should focus
+  on richer data, stronger temporal modeling, and multi-horizon training while
+  keeping the main path predictor single-output.
 
 ## Environment Setup On SSH
 
@@ -297,10 +390,7 @@ python -m src.eval_path_predictor \
 1. Move heavy training to the SSH GPU server.
 2. Sync or regenerate the v2 horizon datasets and DINOv3 caches.
 3. Re-run comparisons with more epochs and early stopping, not only 6 epochs.
-4. Add multi-modal trajectory metrics:
-   - `minADE`
-   - `minFDE`
-   - mode confidence / calibration
+4. Add horizon-conditioned diagnostics and endpoint/curvature error breakdowns.
 5. Train one multi-horizon model instead of separate deterministic models for
    every horizon.
 6. Increase dataset diversity beyond Doom-only if possible.

@@ -13,6 +13,52 @@ from torch.utils.data import Dataset
 from .io import load_json, read_jsonl
 
 
+def sample_group_key(sample: dict[str, Any], key: str) -> str:
+    """Resolve a stable grouping key for balancing or split diagnostics."""
+    normalized = key.lower()
+    source = sample.get("source", {})
+    metadata = sample.get("metadata", {})
+    source_id = str(source.get("source_id") or metadata.get("source_id") or "unknown_source")
+    env_name = str(source.get("env_name") or metadata.get("env_name") or "unknown_env")
+    scenario = str(metadata.get("scenario") or "unknown_scenario")
+    map_id = str(metadata.get("map_id") or "unknown_map")
+    policy = str(metadata.get("policy") or "unknown_policy")
+    episode_id = str(sample.get("episode_id") or "unknown_episode")
+
+    if normalized in {"none", ""}:
+        return "all"
+    if normalized == "source":
+        return source_id
+    if normalized == "scenario":
+        return "::".join([env_name, scenario])
+    if normalized == "map":
+        return "::".join([env_name, scenario, map_id])
+    if normalized == "episode":
+        return episode_id
+    if normalized == "policy":
+        return policy
+    if normalized == "source_scenario":
+        return "::".join([source_id, scenario])
+    if normalized == "source_map":
+        return "::".join([source_id, scenario, map_id])
+    if normalized == "source_policy":
+        return "::".join([source_id, policy])
+    raise ValueError(f"Unsupported sample group key: {key}")
+
+
+def sample_balance_metadata(sample: dict[str, Any]) -> dict[str, str]:
+    return {
+        "source": sample_group_key(sample, "source"),
+        "scenario": sample_group_key(sample, "scenario"),
+        "map": sample_group_key(sample, "map"),
+        "episode": sample_group_key(sample, "episode"),
+        "policy": sample_group_key(sample, "policy"),
+        "source_scenario": sample_group_key(sample, "source_scenario"),
+        "source_map": sample_group_key(sample, "source_map"),
+        "source_policy": sample_group_key(sample, "source_policy"),
+    }
+
+
 def load_rgb_tensor(path: Path, image_size: int | tuple[int, int]) -> torch.Tensor:
     if isinstance(image_size, int):
         size = (image_size, image_size)
@@ -93,6 +139,7 @@ class WITVZPathDataset(Dataset):
             "future_path": torch.tensor(sample["future_local_path"], dtype=torch.float32),
             "metadata": sample.get("metadata", {}),
             "source": sample.get("source", {}),
+            "balance": sample_balance_metadata(sample),
             "current_pose": sample.get("current_pose"),
             "rgb_history_paths": sample["rgb_history_paths"],
         }
@@ -129,6 +176,7 @@ def collate_path_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
         "future_path": torch.stack([item["future_path"] for item in batch], dim=0),
         "metadata": [item["metadata"] for item in batch],
         "source": [item["source"] for item in batch],
+        "balance": [item["balance"] for item in batch],
         "current_pose": [item["current_pose"] for item in batch],
         "rgb_history_paths": [item["rgb_history_paths"] for item in batch],
     }

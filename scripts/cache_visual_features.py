@@ -29,6 +29,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--device", default="auto")
     parser.add_argument("--dtype", choices=["float16", "float32"], default="float16")
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--num-shards", type=int, default=1)
+    parser.add_argument("--shard-index", type=int, default=0)
+    parser.add_argument(
+        "--payload",
+        choices=["dict", "tensor"],
+        default="dict",
+        help="Store each feature as a metadata dict or as the raw tensor only.",
+    )
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--mixed-precision", action="store_true")
     return parser.parse_args()
@@ -92,12 +100,19 @@ def save_manifest(
         "token_shape": list(token_shape),
         "history_frames": dataset_manifest.get("history_frames"),
         "num_cached": num_cached,
+        "payload": args.payload,
+        "num_shards": args.num_shards,
+        "shard_index": args.shard_index,
     }
     (output_dir / "feature_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
 
 def main() -> None:
     args = parse_args()
+    if args.num_shards < 1:
+        raise ValueError("--num-shards must be >= 1")
+    if args.shard_index < 0 or args.shard_index >= args.num_shards:
+        raise ValueError("--shard-index must be in [0, num_shards)")
     args.output_dir.mkdir(parents=True, exist_ok=True)
     feature_dir = args.output_dir / "features"
     feature_dir.mkdir(parents=True, exist_ok=True)
@@ -108,6 +123,12 @@ def main() -> None:
     samples = read_jsonl(args.dataset / "samples.jsonl")
     if args.limit > 0:
         samples = samples[: args.limit]
+    total_unsharded = len(samples)
+    if args.num_shards > 1:
+        samples = [
+            sample for index, sample in enumerate(samples)
+            if index % args.num_shards == args.shard_index
+        ]
 
     encoder = build_visual_encoder(args.backbone, hidden_dim=128, freeze_backbone=True).to(device)
     encoder.eval()
@@ -139,17 +160,22 @@ def main() -> None:
         if token_shape is None:
             token_shape = tuple(tokens.shape[1:])
         for sample, sample_tokens in zip(batch_samples, tokens, strict=True):
-            torch.save(
-                {
+            payload: torch.Tensor | dict[str, Any]
+            if args.payload == "tensor":
+                payload = sample_tokens.clone()
+            else:
+                payload = {
                     "sample_id": sample["sample_id"],
                     "visual_tokens": sample_tokens.clone(),
                     "backbone": args.backbone,
                     "image_size": args.image_size,
-                },
-                feature_dir / f"{sample['sample_id']}.pt",
-            )
+                }
+            torch.save(payload, feature_dir / f"{sample['sample_id']}.pt")
             cached += 1
-        print(f"cached={cached}/{len(samples)}")
+        print(
+            f"shard={args.shard_index}/{args.num_shards} "
+            f"cached={cached}/{len(samples)} total={total_unsharded}"
+        )
 
     for sample in samples:
         output_path = feature_dir / f"{sample['sample_id']}.pt"
@@ -167,7 +193,26 @@ def main() -> None:
     flush(pending)
     if token_shape is None:
         raise ValueError("No feature tensors were cached")
-    save_manifest(args.output_dir, args, dataset_manifest, token_shape, cached)
+    if args.num_shards == 1:
+        save_manifest(args.output_dir, args, dataset_manifest, token_shape, cached)
+    else:
+        shard_manifest = {
+            "dataset": args.dataset.as_posix(),
+            "dataset_id": dataset_manifest.get("dataset_id"),
+            "backbone": args.backbone,
+            "image_size": args.image_size,
+            "dtype": args.dtype,
+            "token_shape": list(token_shape),
+            "history_frames": dataset_manifest.get("history_frames"),
+            "num_cached": cached,
+            "payload": args.payload,
+            "num_shards": args.num_shards,
+            "shard_index": args.shard_index,
+        }
+        (args.output_dir / f"feature_manifest_shard_{args.shard_index:03d}.json").write_text(
+            json.dumps(shard_manifest, indent=2),
+            encoding="utf-8",
+        )
 
 
 if __name__ == "__main__":

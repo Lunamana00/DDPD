@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import random
 from pathlib import Path
 from typing import Any
 
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 from .losses import trajectory_loss
 from .metrics import ade, fde, per_horizon_error, select_best_trajectory
 from .models.factory import create_model, needs_rgb
-from .wit_vz.dataset import WITVZPathDataset, collate_path_batch
+from .wit_vz.dataset import WITVZPathDataset, collate_path_batch, sample_group_key
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,6 +42,39 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument(
+        "--data-parallel",
+        action="store_true",
+        help="Wrap the model with torch.nn.DataParallel when multiple CUDA devices are visible.",
+    )
+    parser.add_argument(
+        "--balance-key",
+        choices=[
+            "none",
+            "source",
+            "scenario",
+            "map",
+            "policy",
+            "episode",
+            "source_scenario",
+            "source_map",
+            "source_policy",
+        ],
+        default="none",
+        help="Metadata group used for train-set balancing.",
+    )
+    parser.add_argument(
+        "--balance-mode",
+        choices=["none", "sampler", "loss", "both"],
+        default="none",
+        help="Apply balancing via WeightedRandomSampler, per-sample loss weights, or both.",
+    )
+    parser.add_argument(
+        "--balance-exponent",
+        type=float,
+        default=1.0,
+        help="Inverse-frequency exponent. 1.0 fully balances groups; 0.5 is softer.",
+    )
     parser.add_argument("--freeze-backbone", action="store_true", default=True)
     parser.add_argument("--train-backbone", dest="freeze_backbone", action="store_false")
     parser.add_argument("--mixed-precision", action="store_true")
@@ -95,6 +129,10 @@ def choose_device(requested: str) -> torch.device:
     return torch.device(requested)
 
 
+def unwrap_model(model: torch.nn.Module) -> torch.nn.Module:
+    return model.module if isinstance(model, torch.nn.DataParallel) else model
+
+
 def move_batch(batch: dict[str, Any], device: torch.device) -> dict[str, Any]:
     moved = dict(batch)
     for key in ("rgb_history", "visual_tokens", "ego_history", "future_path"):
@@ -123,6 +161,72 @@ def resolve_scale(value: str | float, dataset: WITVZPathDataset | None = None, f
         if normalized in {"none", "off"}:
             return 1.0
     return float(value)
+
+
+def compute_balance_weights(
+    samples: list[dict[str, Any]],
+    key: str,
+    exponent: float,
+) -> tuple[torch.Tensor, dict[str, Any]]:
+    if key == "none":
+        weights = torch.ones(len(samples), dtype=torch.float32)
+        return weights, {"enabled": False, "key": key, "groups": {}}
+
+    groups = [sample_group_key(sample, key) for sample in samples]
+    counts = Counter(groups)
+    raw_weights = torch.tensor(
+        [float(counts[group]) ** (-max(exponent, 0.0)) for group in groups],
+        dtype=torch.float32,
+    )
+    weights = raw_weights * (len(raw_weights) / raw_weights.sum().clamp_min(1.0e-6))
+    group_weights = {
+        group: float(float(count) ** (-max(exponent, 0.0)))
+        for group, count in counts.items()
+    }
+    mean_raw_weight = sum(group_weights[group] * count for group, count in counts.items()) / max(len(groups), 1)
+    normalized_group_weights = {
+        group: weight / max(mean_raw_weight, 1.0e-6)
+        for group, weight in group_weights.items()
+    }
+    return weights, {
+        "enabled": True,
+        "key": key,
+        "exponent": exponent,
+        "groups": {
+            group: {
+                "count": int(count),
+                "weight": float(normalized_group_weights[group]),
+            }
+            for group, count in sorted(counts.items())
+        },
+    }
+
+
+def make_loss_weight_lookup(samples: list[dict[str, Any]], key: str, exponent: float) -> dict[str, float]:
+    if key == "none":
+        return {}
+    _weights, stats = compute_balance_weights(samples, key, exponent)
+    return {
+        group: float(values["weight"])
+        for group, values in stats.get("groups", {}).items()
+    }
+
+
+def batch_sample_weights(
+    batch: dict[str, Any],
+    key: str,
+    weight_lookup: dict[str, float],
+    device: torch.device,
+) -> torch.Tensor | None:
+    if key == "none" or not weight_lookup:
+        return None
+    weights = []
+    for item in batch.get("balance", []):
+        group = item[key]
+        weights.append(weight_lookup.get(group, 1.0))
+    if not weights:
+        return None
+    return torch.tensor(weights, dtype=torch.float32, device=device)
 
 
 @torch.no_grad()
@@ -191,10 +295,32 @@ def make_loader(args: argparse.Namespace, split: str, load_rgb: bool) -> DataLoa
         load_rgb=load_rgb,
         visual_feature_cache_dir=getattr(args, "visual_feature_cache", None),
     )
+    sampler = None
+    shuffle = split == "train"
+    balance_key = getattr(args, "balance_key", "none")
+    balance_mode = getattr(args, "balance_mode", "none")
+    balance_exponent = getattr(args, "balance_exponent", 1.0)
+    if (
+        split == "train"
+        and balance_key != "none"
+        and balance_mode in {"sampler", "both"}
+    ):
+        weights, _stats = compute_balance_weights(
+            dataset.samples,
+            balance_key,
+            balance_exponent,
+        )
+        sampler = WeightedRandomSampler(
+            weights=weights,
+            num_samples=len(weights),
+            replacement=True,
+        )
+        shuffle = False
     return DataLoader(
         dataset,
         batch_size=args.batch_size,
-        shuffle=(split == "train"),
+        shuffle=shuffle,
+        sampler=sampler,
         num_workers=args.num_workers,
         collate_fn=collate_path_batch,
     )
@@ -239,6 +365,9 @@ def save_checkpoint(
             "dropout": args.dropout,
             "weight_decay": args.weight_decay,
             "grad_clip_norm": args.grad_clip_norm,
+            "balance_key": args.balance_key,
+            "balance_mode": args.balance_mode,
+            "balance_exponent": args.balance_exponent,
             "early_stopping_patience": args.early_stopping_patience,
             "early_stopping_min_delta": args.early_stopping_min_delta,
             "lr_scheduler_patience": args.lr_scheduler_patience,
@@ -247,6 +376,7 @@ def save_checkpoint(
             "trajectory_scale": float(getattr(args, "resolved_trajectory_scale", 1.0)),
             "residual_scale": float(getattr(args, "resolved_residual_scale", 1.0)),
             "use_constant_velocity_residual": bool(getattr(args, "use_constant_velocity_residual", True)),
+            "data_parallel": bool(getattr(args, "data_parallel", False)),
             "loss": args.loss,
             "metrics": metrics,
         },
@@ -269,6 +399,16 @@ def main() -> None:
     residual_scale = resolve_scale(args.residual_scale, None, fallback=trajectory_scale)
     args.resolved_trajectory_scale = trajectory_scale
     args.resolved_residual_scale = residual_scale
+    balance_loss_weights = make_loss_weight_lookup(
+        train_loader.dataset.samples,
+        args.balance_key,
+        args.balance_exponent,
+    )
+    _balance_sampler_weights, balance_stats = compute_balance_weights(
+        train_loader.dataset.samples,
+        args.balance_key,
+        args.balance_exponent,
+    )
 
     model = create_model(
         args.model,
@@ -294,6 +434,8 @@ def main() -> None:
         use_constant_velocity_residual=args.use_constant_velocity_residual,
         residual_scale=residual_scale,
     ).to(device)
+    if args.data_parallel and device.type == "cuda" and torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model)
 
     config = vars(args).copy()
     config["dataset"] = args.dataset.as_posix()
@@ -303,6 +445,7 @@ def main() -> None:
     config["device"] = str(device)
     config["resolved_trajectory_scale"] = trajectory_scale
     config["resolved_residual_scale"] = residual_scale
+    config["balance_stats"] = balance_stats
     (args.output_dir / "config.json").write_text(json.dumps(config, indent=2), encoding="utf-8")
 
     if args.model == "constant_velocity":
@@ -324,7 +467,7 @@ def main() -> None:
         )
         metrics = {"val": val_metrics, "test": test_metrics, "model": args.model}
         (args.output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
-        save_checkpoint(args.output_dir / "best.pt", model, args, dataset_manifest, metrics)
+        save_checkpoint(args.output_dir / "best.pt", unwrap_model(model), args, dataset_manifest, metrics)
         with (args.output_dir / "predictions.jsonl").open("w", encoding="utf-8") as f:
             for item in predictions:
                 f.write(json.dumps(item, separators=(",", ":")) + "\n")
@@ -359,6 +502,14 @@ def main() -> None:
         for batch in train_loader:
             batch = move_batch(batch, device)
             optimizer.zero_grad(set_to_none=True)
+            sample_weight = None
+            if args.balance_mode in {"loss", "both"}:
+                sample_weight = batch_sample_weights(
+                    batch,
+                    args.balance_key,
+                    balance_loss_weights,
+                    device,
+                )
             with torch.amp.autocast("cuda", enabled=args.mixed_precision and device.type == "cuda"):
                 pred = model(batch)
                 loss = trajectory_loss(
@@ -367,6 +518,7 @@ def main() -> None:
                     args.loss,
                     coordinate_scale=trajectory_scale,
                     multimodal_confidence_weight=args.multimodal_confidence_weight,
+                    sample_weight=sample_weight,
                 )
             if not torch.isfinite(loss):
                 raise FloatingPointError(f"Non-finite loss at epoch {epoch}: {float(loss.detach().cpu())}")
@@ -414,7 +566,7 @@ def main() -> None:
             best_val = val_metrics["ADE"]
             best_epoch = epoch
             epochs_without_improvement = 0
-            save_checkpoint(args.output_dir / "best.pt", model, args, dataset_manifest, row)
+            save_checkpoint(args.output_dir / "best.pt", unwrap_model(model), args, dataset_manifest, row)
         else:
             epochs_without_improvement += 1
         if args.early_stopping_patience > 0 and epochs_without_improvement >= args.early_stopping_patience:
@@ -425,7 +577,7 @@ def main() -> None:
             break
 
     checkpoint = torch.load(args.output_dir / "best.pt", map_location=device)
-    model.load_state_dict(checkpoint["model_state"])
+    unwrap_model(model).load_state_dict(checkpoint["model_state"])
     val_metrics, _ = evaluate_loader(
         model,
         val_loader,
@@ -444,7 +596,7 @@ def main() -> None:
     )
     metrics = {"model": args.model, "history": history, "val": val_metrics, "test": test_metrics}
     (args.output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
-    save_checkpoint(args.output_dir / "best.pt", model, args, dataset_manifest, metrics)
+    save_checkpoint(args.output_dir / "best.pt", unwrap_model(model), args, dataset_manifest, metrics)
     with (args.output_dir / "predictions.jsonl").open("w", encoding="utf-8") as f:
         for item in predictions:
             f.write(json.dumps(item, separators=(",", ":")) + "\n")

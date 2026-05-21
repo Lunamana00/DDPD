@@ -31,10 +31,10 @@ Core components:
 - temporal adapter over visual history, either GRU/temporal Transformer or TimeSformer-style divided space-time attention, with optional temporal shift and multi-resolution temporal difference mixing
 - learned cue token selector, either query-attention pooling, TokenLearner-style soft attention-map token mining, or score-gated Top-K token mining
 - cue memory bank conditioned on ego-motion, either GRU-cell slots or content-addressed attention memory
-- path query decoder
+- path query decoder that outputs one future local trajectory `[B, H, 2]`
 - constant-velocity motion prior plus learned residual future local path head
 
-The learned head predicts a residual over a constant-velocity trajectory. Residual output is zero-initialized, so the proposed model starts from the motion baseline instead of first needing to relearn straight-line egomotion. Training uses an auto-estimated coordinate scale for the loss and residual de-normalization. Raw ADE/FDE metrics remain in local map units.
+The paper-facing main model uses a single deterministic path output. The learned head predicts a residual over a constant-velocity trajectory. Residual output is zero-initialized, so the proposed model starts from the motion baseline instead of first needing to relearn straight-line egomotion. Training uses an auto-estimated coordinate scale for the loss and residual de-normalization. Raw ADE/FDE metrics remain in local map units.
 
 Architecture alignment note: the paper-aligned experimental path uses `selector_type=tokenlearner`, `temporal_type=timesformer`, `use_temporal_shift=true`, `use_temporal_difference_conv=true`, `use_spatial_graph=true`, and `memory_type=attention`. This implements TokenLearner-style soft spatial attention maps for cue mining, TimeSformer-style divided temporal/spatial attention, STRNet-inspired dynamic spatial graph and temporal shift/difference mixing, and Memory-Network-inspired content-addressed memory writes. It is still not a full reproduction of STRNet because the project predicts future local paths rather than goal-conditioned navigation policies and does not include STRNet's goal-observation fusion stack.
 

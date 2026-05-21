@@ -28,6 +28,8 @@ def test_pause_action_vector_name():
 def test_vizdoom_collection_smoke(tmp_path):
     pytest.importorskip("vizdoom")
     out_root = tmp_path / "raw"
+    env = dict(os.environ)
+    env.setdefault("SDL_AUDIODRIVER", "dummy")
     result = subprocess.run(
         [
             sys.executable,
@@ -45,7 +47,9 @@ def test_vizdoom_collection_smoke(tmp_path):
         ],
         check=True,
         capture_output=True,
+        env=env,
         text=True,
+        timeout=30,
     )
     assert "Wrote WIT-VZ raw run" in result.stdout
     assert (out_root / "itest" / "manifest.json").exists()

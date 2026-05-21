@@ -152,6 +152,16 @@ def test_loss_and_metrics():
     assert fde(pred, target).item() > 0
 
 
+def test_trajectory_loss_accepts_sample_weights():
+    pred = torch.zeros(2, 2, 2)
+    target = torch.stack([torch.zeros(2, 2), torch.ones(2, 2) * 10.0], dim=0)
+    unweighted = trajectory_loss(pred, target, "mse")
+    first_only = trajectory_loss(pred, target, "mse", sample_weight=torch.tensor([1.0, 0.0]))
+    second_only = trajectory_loss(pred, target, "mse", sample_weight=torch.tensor([0.0, 1.0]))
+    assert first_only.item() == 0.0
+    assert second_only.item() > unweighted.item()
+
+
 def test_multimodal_loss_and_metrics_choose_best_candidate():
     target = torch.zeros(2, 3, 2)
     pred = {

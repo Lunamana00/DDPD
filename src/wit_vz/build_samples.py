@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import random
 import re
@@ -11,6 +12,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw
 
+from .dataset import sample_group_key
 from .geometry import egomotion_history_from_records, world_future_path_to_local
 from .io import load_json, read_jsonl, write_json, write_jsonl
 
@@ -72,6 +74,9 @@ def make_group_splits(
     seed: int,
     strategy: str = "episode",
 ) -> tuple[dict[str, list[str]], str]:
+    if not samples:
+        return {"train": [], "val": [], "test": []}, strategy
+
     def episode_key(sample: dict[str, Any]) -> str:
         return str(sample["episode_id"])
 
@@ -122,6 +127,50 @@ def make_group_splits(
     return splits, resolved_strategy
 
 
+def summarize_split_diagnostics(
+    samples: list[dict[str, Any]],
+    splits: dict[str, list[str]],
+) -> dict[str, Any]:
+    by_id = {sample["sample_id"]: sample for sample in samples}
+    diagnostic_keys = [
+        "source",
+        "scenario",
+        "map",
+        "policy",
+        "episode",
+        "source_scenario",
+        "source_map",
+        "source_policy",
+    ]
+    by_split: dict[str, Any] = {}
+    split_group_sets: dict[str, dict[str, set[str]]] = {
+        key: {} for key in diagnostic_keys
+    }
+    for split_name, sample_ids in splits.items():
+        split_samples = [by_id[sample_id] for sample_id in sample_ids if sample_id in by_id]
+        groups: dict[str, dict[str, int]] = {}
+        for key in diagnostic_keys:
+            counts = Counter(sample_group_key(sample, key) for sample in split_samples)
+            groups[key] = dict(sorted(counts.items()))
+            split_group_sets[key][split_name] = set(counts)
+        by_split[split_name] = {
+            "num_samples": len(split_samples),
+            "groups": groups,
+        }
+
+    leakage: dict[str, dict[str, list[str]]] = {}
+    for key, per_split in split_group_sets.items():
+        train = per_split.get("train", set())
+        val = per_split.get("val", set())
+        test = per_split.get("test", set())
+        leakage[key] = {
+            "train_val_overlap": sorted(train & val),
+            "train_test_overlap": sorted(train & test),
+            "val_test_overlap": sorted(val & test),
+        }
+    return {"by_split": by_split, "leakage": leakage}
+
+
 def source_descriptor(raw_dir: Path, manifest: dict[str, Any], index: int) -> dict[str, str]:
     run_id = str(manifest.get("run_id") or raw_dir.name)
     source_id = safe_id(run_id)
@@ -168,6 +217,7 @@ def build_samples(
         raw_dir_entries[source_id] = raw_dir.as_posix()
         step_gap = sample_every_raw_step(manifest, sample_fps)
         source_sample_count = 0
+        source_policy_counts: Counter[str] = Counter()
 
         for episode in manifest["episodes"]:
             raw_episode_id = episode["episode_id"]
@@ -186,6 +236,8 @@ def build_samples(
                 history_records = [records[i] for i in history_indices]
                 future_records = [records[i] for i in future_indices]
                 center_record = records[center_idx]
+                center_action = center_record.get("action", {})
+                policy = str(center_action.get("policy") or manifest.get("policy") or "unknown_policy")
                 future_world = [
                     {"x": item["pose"]["x"], "y": item["pose"]["y"]} for item in future_records
                 ]
@@ -225,6 +277,7 @@ def build_samples(
                         "scenario": source["scenario"],
                         "raw_run_id": source["raw_run_id"],
                         "raw_episode_id": raw_episode_id,
+                        "policy": policy,
                         "sample_fps": sample_fps,
                         "step_gap": step_gap,
                         "history_frames": history_frames,
@@ -234,6 +287,7 @@ def build_samples(
                 }
                 samples.append(sample)
                 source_sample_count += 1
+                source_policy_counts[policy] += 1
 
         source_summaries[source_id] = {
             "env_name": source["env_name"],
@@ -245,12 +299,14 @@ def build_samples(
             "step_gap": step_gap,
             "num_samples": source_sample_count,
             "num_episodes": len(manifest.get("episodes", [])),
+            "policy_counts": dict(sorted(source_policy_counts.items())),
         }
 
     out_dir.mkdir(parents=True, exist_ok=True)
     write_jsonl(out_dir / "samples.jsonl", samples)
     splits, resolved_split_strategy = make_group_splits(samples, seed, split_strategy)
     write_json(out_dir / "splits.json", splits)
+    split_diagnostics = summarize_split_diagnostics(samples, splits)
     step_gaps = sorted({summary["step_gap"] for summary in source_summaries.values()})
     dataset_manifest = {
         "dataset_id": out_dir.name,
@@ -268,8 +324,10 @@ def build_samples(
         },
         "history_frames": history_frames,
         "future_steps": future_steps,
+        "requested_split_strategy": f"{split_strategy}-disjoint",
         "split_strategy": f"{resolved_split_strategy}-disjoint",
         "splits": {key: len(value) for key, value in splits.items()},
+        "split_diagnostics": split_diagnostics,
         "target": "future_local_path",
         "coordinate_convention": "local x=forward, local y=right, origin=current pose",
     }

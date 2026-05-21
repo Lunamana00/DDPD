@@ -47,12 +47,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-cue-tokens", type=int, default=8)
     parser.add_argument("--num-modes", type=int, default=1)
     parser.add_argument("--multimodal-confidence-weight", type=float, default=0.05)
-    parser.add_argument("--temporal-type", choices=["transformer", "gru", "timesformer"], default="transformer")
+    parser.add_argument("--temporal-type", choices=["transformer", "gru", "timesformer", "strnet"], default="transformer")
+    parser.add_argument("--temporal-layers", type=int, default=1)
     parser.add_argument(
         "--selector-type",
         choices=["query_attention", "tokenlearner", "topk_tokenlearner"],
         default="query_attention",
     )
+    parser.add_argument("--selector-layers", type=int, default=1)
+    parser.add_argument("--tokenlearner-pooling", choices=["sigmoid", "softmax"], default="sigmoid")
     parser.add_argument(
         "--memory-type",
         choices=["gru_cell", "attention"],
@@ -62,6 +65,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--spatial-graph-neighbors", type=int, default=8)
     parser.add_argument("--use-temporal-difference-conv", action="store_true")
     parser.add_argument("--use-temporal-shift", action="store_true")
+    parser.add_argument("--decoder-layers", type=int, default=1)
+    parser.add_argument("--cue-temporal-layers", type=int, default=1)
     parser.add_argument(
         "--trajectory-scale",
         default="auto",
@@ -218,6 +223,11 @@ def save_checkpoint(
             "freeze_backbone": args.freeze_backbone,
             "num_cue_tokens": args.num_cue_tokens,
             "num_modes": args.num_modes,
+            "temporal_layers": args.temporal_layers,
+            "selector_layers": args.selector_layers,
+            "decoder_layers": args.decoder_layers,
+            "cue_temporal_layers": args.cue_temporal_layers,
+            "tokenlearner_pooling": args.tokenlearner_pooling,
             "selector_type": args.selector_type,
             "memory_type": args.memory_type,
             "use_spatial_graph": args.use_spatial_graph,
@@ -269,6 +279,11 @@ def main() -> None:
         num_cue_tokens=args.num_cue_tokens,
         num_modes=args.num_modes,
         temporal_type=args.temporal_type,
+        temporal_layers=args.temporal_layers,
+        selector_layers=args.selector_layers,
+        decoder_layers=args.decoder_layers,
+        cue_temporal_layers=args.cue_temporal_layers,
+        tokenlearner_pooling=args.tokenlearner_pooling,
         selector_type=args.selector_type,
         memory_type=args.memory_type,
         use_spatial_graph=args.use_spatial_graph,

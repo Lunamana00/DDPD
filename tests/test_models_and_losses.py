@@ -71,6 +71,24 @@ def test_cue_memory_tokenlearner_graph_forward_shape():
     assert out.shape == (2, 3, 2)
 
 
+def test_cue_memory_strnet_tokenlearner_forward_shape():
+    batch = make_batch(batch=2, history=4, future=3)
+    model = TwoStreamEgocentricCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="small_cnn",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="strnet",
+        freeze_backbone=False,
+        selector_type="tokenlearner",
+        memory_type="attention",
+        spatial_graph_neighbors=3,
+        cue_temporal_layers=1,
+    )
+    out = model(batch)
+    assert out.shape == (2, 3, 2)
+
+
 def test_cue_memory_residual_initializes_to_constant_velocity():
     batch = make_batch(batch=2, history=5, future=3)
     model = TwoStreamEgocentricCueMemoryPathPredictor(

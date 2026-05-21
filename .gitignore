@@ -46,5 +46,7 @@ runs/**/predictions.jsonl
 runs/cue_memory_arch_v2_multimodal*/
 runs/cue_memory_regularized*/
 runs/cue_memory_dinov3*/
+runs/cue_memory_strnet_tokenlearner_dinov3_cached*/
+runs/cue_memory_paper_aligned_dinov3_cached_eval_compat*/
 runs/model_sweep*/
 runs/wit_vz_v2*/

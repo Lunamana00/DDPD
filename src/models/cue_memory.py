@@ -133,6 +133,52 @@ class DynamicSpatialGraphAggregator(nn.Module):
         return aggregated.reshape(batch, time, num_tokens, dim)
 
 
+class EdgeMessageDynamicSpatialGraphAggregator(nn.Module):
+    """Dynamic graph aggregation with STRNet-style edge messages."""
+
+    def __init__(self, dim: int, neighbors: int = 8, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.neighbors = neighbors
+        self.norm = nn.LayerNorm(dim)
+        self.q = nn.Linear(dim, dim)
+        self.k = nn.Linear(dim, dim)
+        self.edge_mlp = nn.Sequential(
+            nn.LayerNorm(dim * 2),
+            nn.Linear(dim * 2, dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim, dim),
+        )
+        self.edge_gate = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, dim), nn.Sigmoid())
+        self.out = nn.Sequential(nn.Linear(dim, dim), nn.Dropout(dropout))
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        # tokens: [B, T, N, D]
+        batch, time, num_tokens, dim = tokens.shape
+        if num_tokens <= 1 or self.neighbors <= 0:
+            return tokens
+        flat = tokens.reshape(batch * time, num_tokens, dim)
+        normalized = self.norm(flat)
+        query = self.q(normalized)
+        key = self.k(normalized)
+        scores = torch.matmul(query, key.transpose(1, 2)) / math.sqrt(dim)
+        eye = torch.eye(num_tokens, device=tokens.device, dtype=torch.bool)[None, :, :]
+        scores = scores.masked_fill(eye, torch.finfo(scores.dtype).min)
+        neighbor_count = min(self.neighbors, num_tokens - 1)
+        top_scores, top_indices = torch.topk(scores, k=neighbor_count, dim=-1)
+        weights = torch.softmax(top_scores, dim=-1)
+        expanded_tokens = normalized[:, None, :, :].expand(-1, num_tokens, -1, -1)
+        gather_index = top_indices[..., None].expand(-1, -1, -1, dim)
+        neighbors = torch.gather(expanded_tokens, dim=2, index=gather_index)
+        center = normalized[:, :, None, :].expand(-1, -1, neighbor_count, -1)
+        edge_features = torch.cat([center, neighbors - center], dim=-1)
+        messages = self.edge_mlp(edge_features)
+        context = (weights[..., None] * messages).sum(dim=2)
+        gate = self.edge_gate(torch.cat([normalized, context], dim=-1))
+        aggregated = flat + self.out(gate * context)
+        return aggregated.reshape(batch, time, num_tokens, dim)
+
+
 class TemporalDifferenceConv(nn.Module):
     """Multi-resolution temporal difference mixing for each spatial token."""
 
@@ -141,10 +187,33 @@ class TemporalDifferenceConv(nn.Module):
         dim: int,
         dilations: tuple[int, ...] = (1, 2),
         dropout: float = 0.1,
+        mode: str = "legacy",
     ) -> None:
         super().__init__()
         self.dilations = dilations
+        self.mode = mode
         self.norm = nn.LayerNorm(dim)
+        self.branches = (
+            nn.ModuleList(
+                [
+                    nn.Sequential(
+                        nn.Conv1d(
+                            dim,
+                            dim,
+                            kernel_size=3,
+                            padding=dilation,
+                            dilation=dilation,
+                            groups=dim,
+                        ),
+                        nn.GELU(),
+                        nn.Conv1d(dim, dim, kernel_size=1),
+                    )
+                    for dilation in dilations
+                ]
+            )
+            if mode == "multi_resolution"
+            else None
+        )
         self.mix = nn.Sequential(
             nn.Conv1d(dim * (len(dilations) + 1), dim, kernel_size=1),
             nn.GELU(),
@@ -165,8 +234,13 @@ class TemporalDifferenceConv(nn.Module):
         # sequence: [B*N, T, D]
         normalized = self.norm(sequence)
         features = [normalized.transpose(1, 2)]
-        for dilation in self.dilations:
-            features.append(self._difference(normalized, dilation).transpose(1, 2))
+        for index, dilation in enumerate(self.dilations):
+            difference = self._difference(normalized, dilation).transpose(1, 2)
+            if self.mode == "multi_resolution":
+                if self.branches is None:
+                    raise RuntimeError("multi_resolution mode requires temporal convolution branches")
+                difference = self.branches[index](difference)
+            features.append(difference)
         mixed = self.mix(torch.cat(features, dim=1)).transpose(1, 2)
         return sequence + mixed
 
@@ -231,6 +305,41 @@ class DividedSpaceTimeBlock(nn.Module):
         return spatial.reshape(batch, time, num_tokens, dim)
 
 
+class STRNetFusionBlock(nn.Module):
+    """STRNet-style spatial graph plus temporal shift and difference-aware conv."""
+
+    def __init__(self, dim: int, neighbors: int = 8, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.spatial_graph = EdgeMessageDynamicSpatialGraphAggregator(dim, neighbors=neighbors, dropout=dropout)
+        self.temporal_shift = TemporalShift(dim)
+        self.difference_conv = TemporalDifferenceConv(
+            dim,
+            dilations=(1, 2, 4),
+            dropout=dropout,
+            mode="multi_resolution",
+        )
+        self.ffn_norm = nn.LayerNorm(dim)
+        self.ffn = nn.Sequential(
+            nn.Linear(dim, dim * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim * 4, dim),
+        )
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        # tokens: [B, T, N, D]
+        tokens = self.spatial_graph(tokens)
+        batch, time, num_tokens, dim = tokens.shape
+        sequence = tokens.permute(0, 2, 1, 3).reshape(batch * num_tokens, time, dim)
+        sequence = self.temporal_shift(sequence)
+        sequence = self.difference_conv(sequence)
+        tokens = sequence.reshape(batch, num_tokens, time, dim).permute(0, 2, 1, 3)
+        flat = tokens.reshape(batch * time * num_tokens, dim)
+        flat = flat + self.dropout(self.ffn(self.ffn_norm(flat)))
+        return flat.reshape(batch, time, num_tokens, dim)
+
+
 class TemporalAdapter(nn.Module):
     def __init__(
         self,
@@ -241,6 +350,7 @@ class TemporalAdapter(nn.Module):
         dropout: float = 0.1,
         use_difference_conv: bool = False,
         use_temporal_shift: bool = False,
+        spatial_graph_neighbors: int = 8,
     ) -> None:
         super().__init__()
         self.temporal_type = temporal_type
@@ -262,6 +372,13 @@ class TemporalAdapter(nn.Module):
         elif temporal_type == "timesformer":
             self.module = nn.ModuleList(
                 [DividedSpaceTimeBlock(dim, heads=heads, dropout=dropout) for _ in range(layers)]
+            )
+        elif temporal_type == "strnet":
+            self.module = nn.ModuleList(
+                [
+                    STRNetFusionBlock(dim, neighbors=spatial_graph_neighbors, dropout=dropout)
+                    for _ in range(layers)
+                ]
             )
         else:
             raise ValueError(f"Unknown temporal_type: {temporal_type}")
@@ -285,6 +402,11 @@ class TemporalAdapter(nn.Module):
                 temporal = block(temporal)
             temporal = self._apply_sequence_mixers(temporal)
             return tokens + temporal
+        if self.temporal_type == "strnet":
+            temporal = positioned
+            for block in self.module:
+                temporal = block(temporal)
+            return temporal
         if self.temporal_type == "gru":
             temporal, _h = self.module(per_spatial_token)
         else:
@@ -345,8 +467,10 @@ class TokenLearnerCueTokenSelector(nn.Module):
         layers: int = 1,
         heads: int = 4,
         dropout: float = 0.1,
+        pooling: str = "sigmoid",
     ) -> None:
         super().__init__()
+        self.pooling = pooling
         hidden = max(dim // 2, 1)
         self.attention_maps = nn.Sequential(
             nn.LayerNorm(dim),
@@ -377,13 +501,61 @@ class TokenLearnerCueTokenSelector(nn.Module):
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:
         # tokens: [B, N, D]
         attention = self.attention_maps(tokens).transpose(1, 2)
-        attention = torch.softmax(attention, dim=-1)
+        if self.pooling == "softmax":
+            attention = torch.softmax(attention, dim=-1)
+        elif self.pooling == "sigmoid":
+            attention = torch.sigmoid(attention)
+            attention = attention / attention.sum(dim=-1, keepdim=True).clamp_min(1.0e-6)
+        else:
+            raise ValueError(f"Unknown TokenLearner pooling mode: {self.pooling}")
         cues = torch.bmm(attention, tokens)
         for layer in self.layers:
             attended, _weights = layer["attn"](cues, cues, cues, need_weights=False)
             cues = layer["norm1"](cues + layer["dropout"](attended))
             cues = layer["norm2"](cues + layer["dropout"](layer["ffn"](cues)))
         return cues
+
+
+class CueSpaceTimeTransformer(nn.Module):
+    """Transformer over TokenLearner cue tokens across time."""
+
+    def __init__(
+        self,
+        dim: int,
+        num_cue_tokens: int,
+        layers: int = 1,
+        heads: int = 4,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        self.layers = layers
+        self.temporal_position = TemporalPositionalEncoding(dim)
+        self.cue_position = nn.Parameter(torch.randn(num_cue_tokens, dim) * 0.02)
+        if layers > 0:
+            layer = nn.TransformerEncoderLayer(
+                d_model=dim,
+                nhead=heads,
+                dim_feedforward=dim * 4,
+                dropout=dropout,
+                batch_first=True,
+                activation="gelu",
+            )
+            self.encoder = nn.TransformerEncoder(layer, num_layers=layers)
+            self.norm = nn.LayerNorm(dim)
+        else:
+            self.encoder = nn.Identity()
+            self.norm = nn.Identity()
+
+    def forward(self, cues_over_time: torch.Tensor) -> torch.Tensor:
+        # cues_over_time: [B, T, K, D]
+        if self.layers <= 0:
+            return cues_over_time
+        batch, time, num_cues, dim = cues_over_time.shape
+        positioned = self.temporal_position(cues_over_time)
+        positioned = positioned + self.cue_position[:num_cues].view(1, 1, num_cues, dim)
+        encoded = self.encoder(positioned.reshape(batch, time * num_cues, dim))
+        encoded = self.norm(encoded)
+        return encoded.reshape(batch, time, num_cues, dim)
 
 
 class TopKTokenLearnerSelector(nn.Module):
@@ -451,12 +623,20 @@ def build_cue_selector(
     layers: int,
     heads: int = 4,
     dropout: float = 0.1,
+    tokenlearner_pooling: str = "sigmoid",
 ) -> nn.Module:
     normalized = selector_type.lower()
     if normalized in {"query_attention", "learned_query", "query"}:
         return LearnedCueTokenSelector(dim, num_cue_tokens, layers, heads, dropout)
     if normalized in {"tokenlearner", "soft_tokenlearner"}:
-        return TokenLearnerCueTokenSelector(dim, num_cue_tokens, layers, heads, dropout)
+        return TokenLearnerCueTokenSelector(
+            dim,
+            num_cue_tokens,
+            layers,
+            heads,
+            dropout,
+            pooling=tokenlearner_pooling,
+        )
     if normalized in {"topk_tokenlearner", "topk"}:
         return TopKTokenLearnerSelector(dim, num_cue_tokens, layers, heads, dropout)
     raise ValueError(f"Unknown selector_type: {selector_type}")
@@ -618,12 +798,14 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
         num_cue_tokens: int = 8,
         selector_layers: int = 1,
         selector_type: str = "query_attention",
+        tokenlearner_pooling: str = "sigmoid",
         memory_type: str = "gru_cell",
         use_spatial_graph: bool = False,
         spatial_graph_neighbors: int = 8,
         use_temporal_difference_conv: bool = False,
         use_temporal_shift: bool = False,
         decoder_layers: int = 1,
+        cue_temporal_layers: int = 1,
         dropout: float = 0.1,
         use_constant_velocity_residual: bool = True,
         residual_scale: float = 1.0,
@@ -642,9 +824,10 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             if use_bottleneck_adapters
             else nn.Identity()
         )
+        strnet_temporal = temporal_type.lower() == "strnet"
         self.spatial_graph = (
             DynamicSpatialGraphAggregator(hidden_dim, spatial_graph_neighbors, dropout=dropout)
-            if use_spatial_graph
+            if use_spatial_graph and not strnet_temporal
             else nn.Identity()
         )
         self.temporal = TemporalAdapter(
@@ -654,12 +837,20 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             dropout=dropout,
             use_difference_conv=use_temporal_difference_conv,
             use_temporal_shift=use_temporal_shift,
+            spatial_graph_neighbors=spatial_graph_neighbors,
         )
         self.selector = build_cue_selector(
             selector_type,
             hidden_dim,
             num_cue_tokens,
             selector_layers,
+            dropout=dropout,
+            tokenlearner_pooling=tokenlearner_pooling,
+        )
+        self.cue_temporal = CueSpaceTimeTransformer(
+            hidden_dim,
+            num_cue_tokens,
+            layers=cue_temporal_layers,
             dropout=dropout,
         )
         self.memory = build_cue_memory_bank(memory_type, hidden_dim, num_cue_tokens, dropout=dropout)
@@ -686,6 +877,7 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
         for t in range(tokens.shape[1]):
             cues.append(self.selector(tokens[:, t, :, :]))
         cues_over_time = torch.stack(cues, dim=1)
+        cues_over_time = self.cue_temporal(cues_over_time)
         memory = self.memory(cues_over_time, batch["ego_history"])
         decoded = self.decoder(memory)
         if not self.use_constant_velocity_residual:

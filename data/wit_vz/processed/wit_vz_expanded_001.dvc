@@ -1,0 +1,6 @@
+outs:
+- md5: 69cdc8bd595f9c0a21542c6372eb0d04.dir
+  size: 2927584
+  nfiles: 11
+  hash: md5
+  path: wit_vz_expanded_001

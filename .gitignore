@@ -3,6 +3,13 @@ __pycache__/
 .pytest_cache/
 .pytest_tmp/
 .tmp*/
+buildtemp/
+uvcache/
+.dvc-home/
+.dvc-cache-home/
+.dvc-config-home/
+.dvc-site-cache/
+.dvc-gdrive/
 pytest-cache-files-*/
 .codex-test-tmp/
 .codex-git/
@@ -15,7 +22,15 @@ pytest-cache-files-*/
 .coverage
 htmlcov/
 
-data/
+data/*
+!data/wit_vz/
+data/wit_vz/*
+!data/wit_vz/processed/
+!data/wit_vz/feature_cache/
+data/wit_vz/processed/*
+data/wit_vz/feature_cache/*
+!data/wit_vz/processed/*.dvc
+!data/wit_vz/feature_cache/*.dvc
 outputs/
 _vizdoom.ini
 

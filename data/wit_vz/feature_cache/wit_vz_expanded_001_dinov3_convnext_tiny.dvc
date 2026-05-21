@@ -1,0 +1,6 @@
+outs:
+- md5: 1b4e9686b02a4fad48c8439ae2c0807f.dir
+  size: 934981915
+  nfiles: 1896
+  hash: md5
+  path: wit_vz_expanded_001_dinov3_convnext_tiny

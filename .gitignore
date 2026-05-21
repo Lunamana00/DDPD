@@ -47,3 +47,4 @@ runs/cue_memory_arch_v2_multimodal*/
 runs/cue_memory_regularized*/
 runs/cue_memory_dinov3*/
 runs/model_sweep*/
+runs/wit_vz_v2*/

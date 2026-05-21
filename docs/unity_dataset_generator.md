@@ -45,16 +45,30 @@ labels reproducible.
 ## Editor Usage
 
 1. Open `client/unity_path_client` in Unity `6000.3.11f1`.
-2. Create an empty scene.
-3. Add an empty GameObject named `UnityDatasetGenerator`.
-4. Attach `UnityDatasetGenerator.cs`.
-5. Configure:
+2. Use the menu item:
+
+```text
+DDPD > Generate Unity Raw Dataset
+```
+
+This writes directly to:
+
+```text
+data/wit_vz/raw/unity_procedural_001
+```
+
+Manual setup is still possible:
+
+1. Create an empty scene.
+2. Add an empty GameObject named `UnityDatasetGenerator`.
+3. Attach `UnityDatasetGenerator.cs`.
+4. Configure:
    - `Run Id`
    - `Episode Count`
    - `Frames Per Episode`
    - `Sample Fps`
    - `Capture Width` / `Capture Height`
-6. Enable `Generate On Start`, then press Play.
+5. Enable `Generate On Start`, then press Play.
 
 By default the raw run is written under Unity's `Application.persistentDataPath`
 inside:
@@ -65,15 +79,16 @@ DDPDUnityDataset/<run_id>
 
 The Unity console prints the exact output path when generation completes.
 
-## Convert To Processed Samples
+## Generate And Convert
 
-Copy the generated raw run into the repo, for example:
+From the repo root on Windows:
 
-```text
-data/wit_vz/raw/unity_procedural_001
+```powershell
+.\scripts\generate_unity_dataset.ps1
 ```
 
-Then run:
+This runs Unity in batch mode, writes the raw run to
+`data/wit_vz/raw/unity_procedural_001`, checks `manifest.json`, then runs:
 
 ```bash
 python -m src.wit_vz.build_samples \
@@ -86,17 +101,23 @@ python -m src.wit_vz.build_samples \
   --split episode
 ```
 
-After that, the existing training scripts can consume the processed dataset.
+The script accepts overrides:
+
+```powershell
+.\scripts\generate_unity_dataset.ps1 `
+  -RunId unity_procedural_002 `
+  -Episodes 12 `
+  -FramesPerEpisode 260 `
+  -CaptureSize 160
+```
 
 ## Batch Mode
 
-The project includes a command-line hook:
+The Unity project includes an editor command:
 
 ```text
---ddpd-generate-dataset
+DDPDUnityDatasetBatch.GenerateDefaultAndQuit
 ```
 
-When Unity is launched with that argument, the bootstrap creates a generator
-object. This is intended for later automation from a Unity batch-mode command.
-For now, the Editor workflow is the safer path because generator settings still
-come from serialized fields.
+It creates an empty scene, creates a `DDPD Unity Dataset Generator` GameObject,
+attaches `UnityDatasetGenerator`, generates the raw run, and exits.

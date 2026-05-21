@@ -39,10 +39,23 @@ Dataset generation:
 
 For training data, use `UnityDatasetGenerator.cs` instead of the debug demo.
 It exports WIT-VZ-compatible raw episodes with RGB frames, poses, and
-ego-motion labels. See:
+ego-motion labels. In Unity, use:
+
+```text
+DDPD > Generate Unity Raw Dataset
+```
+
+See:
 
 ```text
 ../../docs/unity_dataset_generator.md
+```
+
+From the repo root, the same generation plus processed-sample conversion can be
+run with:
+
+```powershell
+.\scripts\generate_unity_dataset.ps1
 ```
 
 GPU server setup:

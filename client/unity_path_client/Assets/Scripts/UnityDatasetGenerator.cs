@@ -73,6 +73,25 @@ public class UnityDatasetGenerator : MonoBehaviour
         }
     }
 
+    public void ConfigureOutput(
+        string newRunId,
+        string newOutputRoot,
+        bool newUsePersistentDataPath,
+        int newEpisodeCount,
+        int newFramesPerEpisode,
+        int newCaptureWidth,
+        int newCaptureHeight
+    )
+    {
+        runId = string.IsNullOrWhiteSpace(newRunId) ? runId : newRunId;
+        outputRoot = string.IsNullOrWhiteSpace(newOutputRoot) ? outputRoot : newOutputRoot;
+        usePersistentDataPath = newUsePersistentDataPath;
+        episodeCount = Mathf.Max(1, newEpisodeCount);
+        framesPerEpisode = Mathf.Max(8, newFramesPerEpisode);
+        captureWidth = Mathf.Max(32, newCaptureWidth);
+        captureHeight = Mathf.Max(32, newCaptureHeight);
+    }
+
     public IEnumerator GenerateDataset()
     {
         if (isGenerating)
@@ -105,6 +124,34 @@ public class UnityDatasetGenerator : MonoBehaviour
         }
     }
 
+    public string GenerateDatasetBlocking()
+    {
+        if (isGenerating)
+        {
+            return ResolveRunDirectory();
+        }
+        isGenerating = true;
+        summaries.Clear();
+
+        string runDirectory = ResolveRunDirectory();
+        if (Directory.Exists(runDirectory) && overwriteExistingRun)
+        {
+            Directory.Delete(runDirectory, true);
+        }
+        Directory.CreateDirectory(runDirectory);
+
+        for (int episodeIndex = 1; episodeIndex <= episodeCount; episodeIndex++)
+        {
+            int episodeSeed = seed + episodeIndex * 1009;
+            GenerateEpisodeBlocking(runDirectory, episodeIndex, episodeSeed);
+        }
+
+        WriteManifest(runDirectory);
+        Debug.Log($"DDPD Unity dataset written to: {runDirectory}");
+        isGenerating = false;
+        return runDirectory;
+    }
+
     private IEnumerator GenerateEpisode(string runDirectory, int episodeIndex, int episodeSeed)
     {
         string episodeId = $"episode_{episodeIndex:0000}";
@@ -130,6 +177,57 @@ public class UnityDatasetGenerator : MonoBehaviour
             agent.transform.SetPositionAndRotation(position, rotation);
 
             yield return new WaitForEndOfFrame();
+
+            string frameRelativePath = $"episodes/{episodeId}/rgb/frame_{step:000000}.png";
+            string frameAbsolutePath = Path.Combine(runDirectory, frameRelativePath.Replace('/', Path.DirectorySeparatorChar));
+            CapturePng(frameAbsolutePath);
+
+            PoseRecord currentPose = ToPoseRecord(agent.transform);
+            string line = BuildStepJson(step, elapsed, frameRelativePath, currentPose, hasPreviousPose, previousPose, episodeSeed);
+            stepLines.Add(line);
+            previousPose = currentPose;
+            hasPreviousPose = true;
+        }
+
+        File.WriteAllLines(Path.Combine(episodeDirectory, "steps.jsonl"), stepLines, Encoding.UTF8);
+        File.WriteAllText(
+            Path.Combine(episodeDirectory, "summary.json"),
+            BuildEpisodeSummaryJson(episodeId, episodeSeed, framesPerEpisode, routeLength),
+            Encoding.UTF8
+        );
+
+        summaries.Add(new EpisodeSummary
+        {
+            episodeId = episodeId,
+            numSteps = framesPerEpisode,
+            seed = episodeSeed,
+            routeLength = routeLength
+        });
+    }
+
+    private void GenerateEpisodeBlocking(string runDirectory, int episodeIndex, int episodeSeed)
+    {
+        string episodeId = $"episode_{episodeIndex:0000}";
+        string episodeDirectory = Path.Combine(runDirectory, "episodes", episodeId);
+        string rgbDirectory = Path.Combine(episodeDirectory, "rgb");
+        Directory.CreateDirectory(rgbDirectory);
+
+        System.Random rng = new System.Random(episodeSeed);
+        List<Vector3> route = GenerateRoute(rng);
+        float routeLength = ComputeRouteLength(route);
+        BuildScene(route, rng);
+        BuildAgent(route[0], route[1]);
+
+        List<string> stepLines = new List<string>(framesPerEpisode);
+        bool hasPreviousPose = false;
+        PoseRecord previousPose = default;
+
+        for (int step = 0; step < framesPerEpisode; step++)
+        {
+            float elapsed = step / Mathf.Max(sampleFps, 0.001f);
+            float distance = Mathf.Min(elapsed * agentSpeedMetersPerSecond, Mathf.Max(0.0f, routeLength - 0.01f));
+            PoseRoute(route, distance, out Vector3 position, out Quaternion rotation);
+            agent.transform.SetPositionAndRotation(position, rotation);
 
             string frameRelativePath = $"episodes/{episodeId}/rgb/frame_{step:000000}.png";
             string frameAbsolutePath = Path.Combine(runDirectory, frameRelativePath.Replace('/', Path.DirectorySeparatorChar));
@@ -189,7 +287,7 @@ public class UnityDatasetGenerator : MonoBehaviour
     {
         if (generatedRoot != null)
         {
-            Destroy(generatedRoot);
+            DestroyObject(generatedRoot);
         }
         generatedRoot = new GameObject("DDPD Procedural Dataset Scene");
         palette = CreatePalette();
@@ -219,7 +317,7 @@ public class UnityDatasetGenerator : MonoBehaviour
     {
         if (agent != null)
         {
-            Destroy(agent);
+            DestroyObject(agent);
         }
         agent = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         agent.name = "DatasetAgent";
@@ -423,7 +521,7 @@ public class UnityDatasetGenerator : MonoBehaviour
             captureCamera.targetTexture = previousTarget;
             RenderTexture.active = previousActive;
             RenderTexture.ReleaseTemporary(target);
-            Destroy(texture);
+            DestroyObject(texture);
         }
     }
 
@@ -655,5 +753,21 @@ public class UnityDatasetGenerator : MonoBehaviour
     {
         float wrapped = Mathf.Repeat(value + 180.0f, 360.0f) - 180.0f;
         return wrapped;
+    }
+
+    private static void DestroyObject(UnityEngine.Object target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+        if (Application.isPlaying)
+        {
+            Destroy(target);
+        }
+        else
+        {
+            DestroyImmediate(target);
+        }
     }
 }

@@ -11,6 +11,10 @@ public static class PathPredictionDemoBootstrap
         {
             return;
         }
+        if (Object.FindFirstObjectByType<UnityDatasetGenerator>() != null)
+        {
+            return;
+        }
 
         GameObject root = new GameObject("DDPD Demo Environment");
         DemoEnvironmentBuilder environment = root.AddComponent<DemoEnvironmentBuilder>();

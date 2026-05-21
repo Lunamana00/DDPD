@@ -35,6 +35,16 @@ from recent motion history without the GPU server.
 The visual cues are intentionally high contrast. They are there so the camera
 stream contains route-relevant information instead of a blank corridor.
 
+Dataset generation:
+
+For training data, use `UnityDatasetGenerator.cs` instead of the debug demo.
+It exports WIT-VZ-compatible raw episodes with RGB frames, poses, and
+ego-motion labels. See:
+
+```text
+../../docs/unity_dataset_generator.md
+```
+
 GPU server setup:
 
 1. Disable `Demo Mode`.

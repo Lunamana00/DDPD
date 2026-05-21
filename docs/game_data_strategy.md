@@ -6,7 +6,45 @@ dependence rather than replacing ViZDoom.
 
 ## Track A: ViZDoom Game Benchmark
 
-Use the multi-source config:
+Use the capstone augmented multi-source config:
+
+```powershell
+uv run python scripts/collect_wit_vz_game_benchmark.py `
+  --config configs/wit_vz_capstone_augmented.json `
+  --overwrite
+```
+
+This collects scripted runs from:
+
+- `deadly_corridor` with corridor-biased control
+- `deadly_corridor` with random control
+- `health_gathering`
+- `health_gathering_supreme`
+- `my_way_home`
+- `take_cover`
+- `predict_position`
+
+Then it builds:
+
+```text
+data/wit_vz/processed/wit_vz_capstone_augmented_001
+```
+
+The default processed set uses a 1-second future horizon so short combat
+episodes still contribute samples. For 3/5/10/30-second analysis, rebuild from
+the same raw runs with `scripts/run_horizon_sweep.py`.
+
+Use a smoke run first:
+
+```powershell
+uv run python scripts/collect_wit_vz_game_benchmark.py `
+  --config configs/wit_vz_capstone_augmented.json `
+  --dry-run `
+  --limit-runs 1 `
+  --episodes 2
+```
+
+The older smaller benchmark is still available:
 
 ```powershell
 uv run python scripts/collect_wit_vz_game_benchmark.py --overwrite
@@ -26,17 +64,46 @@ Then it builds:
 data/wit_vz/processed/wit_vz_game_benchmark_001
 ```
 
-The default processed set uses a 1-second future horizon so short combat
-episodes still contribute samples. For 3/5/10/30-second analysis, rebuild from
-the same raw runs with `scripts/run_horizon_sweep.py`.
-
 Use a smoke run first:
 
 ```powershell
 uv run python scripts/collect_wit_vz_game_benchmark.py --dry-run --limit-runs 1 --episodes 2
 ```
 
-## Track B: Game-Like Unity Synthetic Data
+## Track B: Human ViZDoom Hold-Out
+
+Human data should be used as the main held-out validation source, not mixed
+blindly into every training split. The point is to test whether the model
+learned visual context beyond a scripted controller.
+
+Record a short human session:
+
+```powershell
+uv run python scripts/record_vizdoom_human_session.py `
+  --scenario deadly_corridor `
+  --run-id wit_vz_human_p001_s001 `
+  --player-id p001 `
+  --episodes 5 `
+  --max-steps 900 `
+  --overwrite
+```
+
+The script opens a visible ViZDoom window in `SPECTATOR` mode, records RGB,
+pose, relative ego-motion, reward, and the last human action vector, then builds:
+
+```text
+data/wit_vz/processed/wit_vz_human_p001_s001
+```
+
+Recommended split discipline:
+
+- train: scripted augmented runs
+- validation: held-out scripted episodes or scenarios
+- final test: human sessions held out by player/session
+- optional mixed training: add only some human sessions after reporting the
+  scripted-only result
+
+## Track C: Game-Like Unity Synthetic Data
 
 Unity synthetic data should be treated as a controlled ablation source. Its job
 is to answer whether visual cues change future-path prediction when recent

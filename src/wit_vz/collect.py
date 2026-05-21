@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import random
 import shutil
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--mode", choices=["scripted", "human"], default="scripted")
     parser.add_argument("--policy", choices=["corridor", "random"], default="corridor")
+    parser.add_argument("--player-id", default=None, help="Optional anonymized player id for human sessions.")
+    parser.add_argument("--session-id", default=None, help="Optional human recording session id.")
+    parser.add_argument(
+        "--human-countdown-sec",
+        type=float,
+        default=3.0,
+        help="Seconds to wait after opening the ViZDoom window in human mode.",
+    )
     parser.add_argument("--screen-width", type=int, default=160)
     parser.add_argument("--screen-height", type=int, default=120)
     parser.add_argument("--save-rgb", action="store_true", default=True)
@@ -126,16 +135,10 @@ def build_game(args: argparse.Namespace) -> tuple[Any, dict[str, Any]]:
     except ImportError as exc:
         raise RuntimeError("ViZDoom is required. Install with: uv pip install vizdoom pillow") from exc
 
-    if args.mode == "human":
-        raise NotImplementedError(
-            "Human recording mode is scaffolded but not implemented for this environment. "
-            "Use --mode scripted for real data collection."
-        )
-
     game = vzd.DoomGame()
     game.set_doom_scenario_path(scenario_path(vzd, args.scenario))
     game.set_doom_map(args.map)
-    game.set_window_visible(bool(args.visible))
+    game.set_window_visible(bool(args.visible or args.mode == "human"))
     game.set_screen_resolution(get_screen_resolution(vzd, args.screen_width, args.screen_height))
     game.set_screen_format(vzd.ScreenFormat.RGB24)
     game.set_depth_buffer_enabled(bool(args.save_depth))
@@ -146,9 +149,14 @@ def build_game(args: argparse.Namespace) -> tuple[Any, dict[str, Any]]:
     game.set_episode_timeout(args.max_steps * args.frame_skip)
     game.set_episode_start_time(10)
     game.set_living_reward(0.0)
-    game.set_mode(vzd.Mode.PLAYER)
+    game.set_mode(vzd.Mode.SPECTATOR if args.mode == "human" else vzd.Mode.PLAYER)
 
-    buttons = [getattr(vzd.Button, name) for name in BUTTON_NAMES if hasattr(vzd.Button, name)]
+    buttons = []
+    button_names = []
+    for name in BUTTON_NAMES:
+        if hasattr(vzd.Button, name):
+            buttons.append(getattr(vzd.Button, name))
+            button_names.append(name)
     variables = []
     variable_names = []
     for name in GAME_VARIABLE_NAMES:
@@ -158,8 +166,14 @@ def build_game(args: argparse.Namespace) -> tuple[Any, dict[str, Any]]:
     game.set_available_buttons(buttons)
     game.set_available_game_variables(variables)
     game.init()
+    if args.mode == "human" and args.human_countdown_sec > 0:
+        print(
+            f"Human mode: focus the ViZDoom window. "
+            f"Recording starts in {args.human_countdown_sec:.1f}s."
+        )
+        time.sleep(args.human_countdown_sec)
     return game, {
-        "button_order": BUTTON_NAMES[: len(buttons)],
+        "button_order": button_names,
         "game_variable_names": variable_names,
         "doom_tics_per_second": 35.0,
     }
@@ -185,6 +199,37 @@ def choose_scripted_action(rng: random.Random, policy: str, step: int) -> tuple[
     action_id = rng.choice(candidates)
     name, vector = ACTION_SPACE[action_id]
     return action_id, name, vector
+
+
+def action_id_for_vector(action_vector: list[int]) -> int | None:
+    for action_id, (_name, vector) in enumerate(ACTION_SPACE):
+        if vector == action_vector:
+            return action_id
+    return None
+
+
+def action_name_from_vector(action_vector: list[int], button_order: list[str]) -> str:
+    active = [name for name, value in zip(button_order, action_vector) if value]
+    return "+".join(active) if active else "PAUSE"
+
+
+def step_environment(
+    game: Any,
+    game_context: dict[str, Any],
+    args: argparse.Namespace,
+    rng: random.Random,
+    step: int,
+) -> tuple[int | None, str, list[int], float]:
+    if args.mode == "human":
+        game.advance_action(args.frame_skip)
+        raw_action = game.get_last_action()
+        action_vector = [int(round(float(value))) for value in raw_action]
+        action_name = action_name_from_vector(action_vector, game_context["button_order"])
+        return action_id_for_vector(action_vector), action_name, action_vector, float(game.get_last_reward())
+
+    action_id, action_name, action_vector = choose_scripted_action(rng, args.policy, step)
+    reward = float(game.make_action(action_vector, args.frame_skip))
+    return action_id, action_name, action_vector, reward
 
 
 def pose_from_variables(variable_values: dict[str, float]) -> dict[str, float]:
@@ -253,8 +298,13 @@ def collect_episode(
             save_png(automap_buffer, run_dir / automap_rel)
             automap_path = automap_rel.as_posix()
 
-        action_id, action_name, action_vector = choose_scripted_action(rng, args.policy, step)
-        reward = float(game.make_action(action_vector, args.frame_skip))
+        action_id, action_name, action_vector, reward = step_environment(
+            game,
+            game_context,
+            args,
+            rng,
+            step,
+        )
         done = bool(game.is_episode_finished())
         total_reward += reward
 
@@ -353,6 +403,8 @@ def main() -> None:
         },
         "generation_mode": args.mode,
         "policy": args.policy,
+        "player_id": args.player_id,
+        "session_id": args.session_id,
         "seed": args.seed,
         "episodes": [
             {

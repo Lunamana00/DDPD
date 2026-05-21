@@ -52,6 +52,8 @@ Models:
 Scripts:
 
 - `scripts/collect_route_vizdoom.py`: earlier route-aware ViZDoom collection prototype.
+- `scripts/collect_wit_vz_game_benchmark.py`: multi-scenario ViZDoom scripted data expansion.
+- `scripts/record_vizdoom_human_session.py`: interactive ViZDoom human recording and sample building.
 - `scripts/run_horizon_sweep.py`: build/train/evaluate multiple future horizons.
 - `scripts/plot_horizon_sweep.py`: plot horizon sweep metrics using PIL.
 

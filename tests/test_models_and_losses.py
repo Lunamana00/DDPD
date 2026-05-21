@@ -58,12 +58,14 @@ def test_cue_memory_tokenlearner_graph_forward_shape():
         backbone_name="small_cnn",
         hidden_dim=32,
         num_cue_tokens=4,
-        temporal_type="transformer",
+        temporal_type="timesformer",
         freeze_backbone=False,
-        selector_type="topk_tokenlearner",
+        selector_type="tokenlearner",
+        memory_type="attention",
         use_spatial_graph=True,
         spatial_graph_neighbors=3,
         use_temporal_difference_conv=True,
+        use_temporal_shift=True,
     )
     out = model(batch)
     assert out.shape == (2, 3, 2)

@@ -171,6 +171,66 @@ class TemporalDifferenceConv(nn.Module):
         return sequence + mixed
 
 
+class TemporalShift(nn.Module):
+    """Lightweight temporal channel shift over each spatial token sequence."""
+
+    def __init__(self, dim: int, shift_ratio: float = 0.25) -> None:
+        super().__init__()
+        self.fold = max(0, int(dim * shift_ratio / 2.0))
+
+    def forward(self, sequence: torch.Tensor) -> torch.Tensor:
+        # sequence: [B*N, T, D]
+        if self.fold == 0 or sequence.shape[1] <= 1:
+            return sequence
+        shifted = sequence.clone()
+        shifted[:, 1:, : self.fold] = sequence[:, :-1, : self.fold]
+        shifted[:, :-1, self.fold : 2 * self.fold] = sequence[:, 1:, self.fold : 2 * self.fold]
+        return shifted
+
+
+class DividedSpaceTimeBlock(nn.Module):
+    """TimeSformer-style temporal attention followed by spatial attention."""
+
+    def __init__(self, dim: int, heads: int = 4, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.temporal_norm = nn.LayerNorm(dim)
+        self.temporal_attn = nn.MultiheadAttention(dim, heads, dropout=dropout, batch_first=True)
+        self.spatial_norm = nn.LayerNorm(dim)
+        self.spatial_attn = nn.MultiheadAttention(dim, heads, dropout=dropout, batch_first=True)
+        self.ffn_norm = nn.LayerNorm(dim)
+        self.ffn = nn.Sequential(
+            nn.Linear(dim, dim * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim * 4, dim),
+        )
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        # tokens: [B, T, N, D]
+        batch, time, num_tokens, dim = tokens.shape
+        temporal = tokens.permute(0, 2, 1, 3).reshape(batch * num_tokens, time, dim)
+        attended, _weights = self.temporal_attn(
+            self.temporal_norm(temporal),
+            self.temporal_norm(temporal),
+            self.temporal_norm(temporal),
+            need_weights=False,
+        )
+        temporal = temporal + self.dropout(attended)
+        tokens = temporal.reshape(batch, num_tokens, time, dim).permute(0, 2, 1, 3)
+
+        spatial = tokens.reshape(batch * time, num_tokens, dim)
+        attended, _weights = self.spatial_attn(
+            self.spatial_norm(spatial),
+            self.spatial_norm(spatial),
+            self.spatial_norm(spatial),
+            need_weights=False,
+        )
+        spatial = spatial + self.dropout(attended)
+        spatial = spatial + self.dropout(self.ffn(self.ffn_norm(spatial)))
+        return spatial.reshape(batch, time, num_tokens, dim)
+
+
 class TemporalAdapter(nn.Module):
     def __init__(
         self,
@@ -180,10 +240,12 @@ class TemporalAdapter(nn.Module):
         heads: int = 4,
         dropout: float = 0.1,
         use_difference_conv: bool = False,
+        use_temporal_shift: bool = False,
     ) -> None:
         super().__init__()
         self.temporal_type = temporal_type
         self.position = TemporalPositionalEncoding(dim)
+        self.temporal_shift = TemporalShift(dim) if use_temporal_shift else nn.Identity()
         self.difference_conv = TemporalDifferenceConv(dim, dropout=dropout) if use_difference_conv else nn.Identity()
         if temporal_type == "transformer":
             layer = nn.TransformerEncoderLayer(
@@ -197,14 +259,32 @@ class TemporalAdapter(nn.Module):
             self.module = nn.TransformerEncoder(layer, num_layers=layers)
         elif temporal_type == "gru":
             self.module = nn.GRU(dim, dim, num_layers=layers, batch_first=True)
+        elif temporal_type == "timesformer":
+            self.module = nn.ModuleList(
+                [DividedSpaceTimeBlock(dim, heads=heads, dropout=dropout) for _ in range(layers)]
+            )
         else:
             raise ValueError(f"Unknown temporal_type: {temporal_type}")
+
+    def _apply_sequence_mixers(self, tokens: torch.Tensor) -> torch.Tensor:
+        batch, time, num_tokens, dim = tokens.shape
+        sequence = tokens.permute(0, 2, 1, 3).reshape(batch * num_tokens, time, dim)
+        sequence = self.difference_conv(sequence)
+        return sequence.reshape(batch, num_tokens, time, dim).permute(0, 2, 1, 3)
 
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:
         # tokens: [B, T, N, D]
         batch, time, num_tokens, dim = tokens.shape
         positioned = self.position(tokens)
         per_spatial_token = positioned.permute(0, 2, 1, 3).reshape(batch * num_tokens, time, dim)
+        per_spatial_token = self.temporal_shift(per_spatial_token)
+        positioned = per_spatial_token.reshape(batch, num_tokens, time, dim).permute(0, 2, 1, 3)
+        if self.temporal_type == "timesformer":
+            temporal = positioned
+            for block in self.module:
+                temporal = block(temporal)
+            temporal = self._apply_sequence_mixers(temporal)
+            return tokens + temporal
         if self.temporal_type == "gru":
             temporal, _h = self.module(per_spatial_token)
         else:
@@ -250,6 +330,57 @@ class LearnedCueTokenSelector(nn.Module):
         cues = self.queries[None, :, :].expand(batch, -1, -1)
         for layer in self.layers:
             attended, _weights = layer["attn"](cues, tokens, tokens, need_weights=False)
+            cues = layer["norm1"](cues + layer["dropout"](attended))
+            cues = layer["norm2"](cues + layer["dropout"](layer["ffn"](cues)))
+        return cues
+
+
+class TokenLearnerCueTokenSelector(nn.Module):
+    """TokenLearner-style soft attention maps that mine S adaptive cue tokens."""
+
+    def __init__(
+        self,
+        dim: int,
+        num_cue_tokens: int = 8,
+        layers: int = 1,
+        heads: int = 4,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        hidden = max(dim // 2, 1)
+        self.attention_maps = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden, num_cue_tokens),
+        )
+        self.layers = nn.ModuleList(
+            [
+                nn.ModuleDict(
+                    {
+                        "attn": nn.MultiheadAttention(dim, heads, batch_first=True),
+                        "norm1": nn.LayerNorm(dim),
+                        "ffn": nn.Sequential(
+                            nn.Linear(dim, dim * 4),
+                            nn.GELU(),
+                            nn.Linear(dim * 4, dim),
+                        ),
+                        "dropout": nn.Dropout(dropout),
+                        "norm2": nn.LayerNorm(dim),
+                    }
+                )
+                for _ in range(layers)
+            ]
+        )
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        # tokens: [B, N, D]
+        attention = self.attention_maps(tokens).transpose(1, 2)
+        attention = torch.softmax(attention, dim=-1)
+        cues = torch.bmm(attention, tokens)
+        for layer in self.layers:
+            attended, _weights = layer["attn"](cues, cues, cues, need_weights=False)
             cues = layer["norm1"](cues + layer["dropout"](attended))
             cues = layer["norm2"](cues + layer["dropout"](layer["ffn"](cues)))
         return cues
@@ -324,7 +455,9 @@ def build_cue_selector(
     normalized = selector_type.lower()
     if normalized in {"query_attention", "learned_query", "query"}:
         return LearnedCueTokenSelector(dim, num_cue_tokens, layers, heads, dropout)
-    if normalized in {"topk_tokenlearner", "tokenlearner", "topk"}:
+    if normalized in {"tokenlearner", "soft_tokenlearner"}:
+        return TokenLearnerCueTokenSelector(dim, num_cue_tokens, layers, heads, dropout)
+    if normalized in {"topk_tokenlearner", "topk"}:
         return TopKTokenLearnerSelector(dim, num_cue_tokens, layers, heads, dropout)
     raise ValueError(f"Unknown selector_type: {selector_type}")
 
@@ -349,6 +482,62 @@ class CueMemoryBank(nn.Module):
             memory = self.gru_cell(flat_in, flat_memory).reshape(batch, num_slots, dim)
             memory = self.norm(memory)
         return memory
+
+
+class AttentionCueMemoryBank(nn.Module):
+    """Content-addressed cue memory with attention writes over memory slots."""
+
+    def __init__(self, dim: int, num_slots: int, ego_dim: int = 3, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.initial_memory = nn.Parameter(torch.zeros(num_slots, dim))
+        self.ego_mlp = nn.Sequential(nn.Linear(ego_dim, dim), nn.GELU(), nn.Linear(dim, dim))
+        self.cue_projection = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim, dim),
+        )
+        self.write_gate = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, dim), nn.Sigmoid())
+        self.write_candidate = nn.Sequential(
+            nn.LayerNorm(dim * 2),
+            nn.Linear(dim * 2, dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim, dim),
+        )
+        self.norm = nn.LayerNorm(dim)
+
+    def forward(self, cues_over_time: torch.Tensor, ego_history: torch.Tensor) -> torch.Tensor:
+        # cues_over_time: [B, T, K, D], ego_history: [B, T, 3]
+        batch, time, _num_cues, dim = cues_over_time.shape
+        memory = self.initial_memory[None, :, :].expand(batch, -1, -1)
+        for t in range(time):
+            ego = self.ego_mlp(ego_history[:, t, :])[:, None, :]
+            cues = self.cue_projection(cues_over_time[:, t, :, :] + ego)
+            scores = torch.matmul(cues, self.norm(memory).transpose(1, 2)) / math.sqrt(dim)
+            write_weights = torch.softmax(scores, dim=-1)
+            slot_context = torch.einsum("bcm,bcd->bmd", write_weights, cues)
+            slot_context = slot_context / write_weights.sum(dim=1).clamp_min(1.0e-6)[..., None]
+            write_input = torch.cat([memory, slot_context], dim=-1)
+            gate = self.write_gate(write_input)
+            candidate = self.write_candidate(write_input)
+            memory = self.norm(memory + gate * (candidate - memory))
+        return memory
+
+
+def build_cue_memory_bank(
+    memory_type: str,
+    dim: int,
+    num_slots: int,
+    dropout: float = 0.1,
+) -> nn.Module:
+    normalized = memory_type.lower()
+    if normalized in {"gru_cell", "gru", "recurrent"}:
+        return CueMemoryBank(dim, num_slots)
+    if normalized in {"attention", "memory_network", "content_addressed"}:
+        return AttentionCueMemoryBank(dim, num_slots, dropout=dropout)
+    raise ValueError(f"Unknown memory_type: {memory_type}")
 
 
 class PathQueryDecoder(nn.Module):
@@ -429,9 +618,11 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
         num_cue_tokens: int = 8,
         selector_layers: int = 1,
         selector_type: str = "query_attention",
+        memory_type: str = "gru_cell",
         use_spatial_graph: bool = False,
         spatial_graph_neighbors: int = 8,
         use_temporal_difference_conv: bool = False,
+        use_temporal_shift: bool = False,
         decoder_layers: int = 1,
         dropout: float = 0.1,
         use_constant_velocity_residual: bool = True,
@@ -462,6 +653,7 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             layers=temporal_layers,
             dropout=dropout,
             use_difference_conv=use_temporal_difference_conv,
+            use_temporal_shift=use_temporal_shift,
         )
         self.selector = build_cue_selector(
             selector_type,
@@ -470,7 +662,7 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             selector_layers,
             dropout=dropout,
         )
-        self.memory = CueMemoryBank(hidden_dim, num_cue_tokens)
+        self.memory = build_cue_memory_bank(memory_type, hidden_dim, num_cue_tokens, dropout=dropout)
         self.decoder = PathQueryDecoder(
             hidden_dim,
             future_steps,

@@ -28,15 +28,15 @@ Core components:
 - visual token encoder
 - bottleneck adapter after selected visual features
 - optional dynamic spatial graph aggregation within each frame
-- temporal adapter over visual history, with optional multi-resolution temporal difference mixing
-- learned cue token selector, either query-attention pooling or score-gated Top-K token mining
-- recurrent cue memory bank conditioned on ego-motion
+- temporal adapter over visual history, either GRU/temporal Transformer or TimeSformer-style divided space-time attention, with optional temporal shift and multi-resolution temporal difference mixing
+- learned cue token selector, either query-attention pooling, TokenLearner-style soft attention-map token mining, or score-gated Top-K token mining
+- cue memory bank conditioned on ego-motion, either GRU-cell slots or content-addressed attention memory
 - path query decoder
 - constant-velocity motion prior plus learned residual future local path head
 
 The learned head predicts a residual over a constant-velocity trajectory. Residual output is zero-initialized, so the proposed model starts from the motion baseline instead of first needing to relearn straight-line egomotion. Training uses an auto-estimated coordinate scale for the loss and residual de-normalization. Raw ADE/FDE metrics remain in local map units.
 
-Architecture alignment note: `selector_type=topk_tokenlearner` now implements input-adaptive Top-K cue mining from visual token scores. This is closer to the TokenLearner motivation than the previous fixed learned-query selector, but it is not a reproduction of TokenLearner's full attention-map and TokenFuser stack. `use_spatial_graph=true` adds a sparse dynamic graph aggregator over frame-local visual tokens. This captures the STRNet-style spatial graph reasoning direction, but it is not a full STRNet implementation because the model does not include goal-observation fusion, hybrid temporal shift, or the exact multi-resolution difference-aware convolution design from STRNet.
+Architecture alignment note: the paper-aligned experimental path uses `selector_type=tokenlearner`, `temporal_type=timesformer`, `use_temporal_shift=true`, `use_temporal_difference_conv=true`, `use_spatial_graph=true`, and `memory_type=attention`. This implements TokenLearner-style soft spatial attention maps for cue mining, TimeSformer-style divided temporal/spatial attention, STRNet-inspired dynamic spatial graph and temporal shift/difference mixing, and Memory-Network-inspired content-addressed memory writes. It is still not a full reproduction of STRNet because the project predicts future local paths rather than goal-conditioned navigation policies and does not include STRNet's goal-observation fusion stack.
 
 The implementation supports a DINOv2 path through optional `transformers` dependencies. In this local environment those dependencies/weights are not available, so smoke runs use `--backbone small_cnn`. This fallback is for tests and CPU prototypes, not the intended final foundation backbone.
 

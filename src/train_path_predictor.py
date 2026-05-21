@@ -46,15 +46,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--num-cue-tokens", type=int, default=8)
     parser.add_argument("--num-modes", type=int, default=1)
     parser.add_argument("--multimodal-confidence-weight", type=float, default=0.05)
-    parser.add_argument("--temporal-type", choices=["transformer", "gru"], default="transformer")
+    parser.add_argument("--temporal-type", choices=["transformer", "gru", "timesformer"], default="transformer")
     parser.add_argument(
         "--selector-type",
-        choices=["query_attention", "topk_tokenlearner"],
+        choices=["query_attention", "tokenlearner", "topk_tokenlearner"],
         default="query_attention",
+    )
+    parser.add_argument(
+        "--memory-type",
+        choices=["gru_cell", "attention"],
+        default="gru_cell",
     )
     parser.add_argument("--use-spatial-graph", action="store_true")
     parser.add_argument("--spatial-graph-neighbors", type=int, default=8)
     parser.add_argument("--use-temporal-difference-conv", action="store_true")
+    parser.add_argument("--use-temporal-shift", action="store_true")
     parser.add_argument(
         "--trajectory-scale",
         default="auto",
@@ -208,9 +214,11 @@ def save_checkpoint(
             "num_cue_tokens": args.num_cue_tokens,
             "num_modes": args.num_modes,
             "selector_type": args.selector_type,
+            "memory_type": args.memory_type,
             "use_spatial_graph": args.use_spatial_graph,
             "spatial_graph_neighbors": args.spatial_graph_neighbors,
             "use_temporal_difference_conv": args.use_temporal_difference_conv,
+            "use_temporal_shift": args.use_temporal_shift,
             "multimodal_confidence_weight": args.multimodal_confidence_weight,
             "temporal_type": args.temporal_type,
             "dropout": args.dropout,
@@ -257,9 +265,11 @@ def main() -> None:
         num_modes=args.num_modes,
         temporal_type=args.temporal_type,
         selector_type=args.selector_type,
+        memory_type=args.memory_type,
         use_spatial_graph=args.use_spatial_graph,
         spatial_graph_neighbors=args.spatial_graph_neighbors,
         use_temporal_difference_conv=args.use_temporal_difference_conv,
+        use_temporal_shift=args.use_temporal_shift,
         dropout=args.dropout,
         use_constant_velocity_residual=args.use_constant_velocity_residual,
         residual_scale=residual_scale,

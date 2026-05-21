@@ -51,6 +51,24 @@ def test_cue_memory_transformer_forward_shape():
     assert out.shape == (2, 3, 2)
 
 
+def test_cue_memory_tokenlearner_graph_forward_shape():
+    batch = make_batch(batch=2, history=4, future=3)
+    model = TwoStreamEgocentricCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="small_cnn",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="transformer",
+        freeze_backbone=False,
+        selector_type="topk_tokenlearner",
+        use_spatial_graph=True,
+        spatial_graph_neighbors=3,
+        use_temporal_difference_conv=True,
+    )
+    out = model(batch)
+    assert out.shape == (2, 3, 2)
+
+
 def test_cue_memory_residual_initializes_to_constant_velocity():
     batch = make_batch(batch=2, history=5, future=3)
     model = TwoStreamEgocentricCueMemoryPathPredictor(

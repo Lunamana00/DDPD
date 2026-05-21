@@ -97,6 +97,80 @@ class BottleneckAdapter(nn.Module):
         return x + self.net(x)
 
 
+class DynamicSpatialGraphAggregator(nn.Module):
+    """Sparse dynamic graph reasoning over visual tokens within each frame."""
+
+    def __init__(self, dim: int, neighbors: int = 8, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.neighbors = neighbors
+        self.norm = nn.LayerNorm(dim)
+        self.q = nn.Linear(dim, dim)
+        self.k = nn.Linear(dim, dim)
+        self.v = nn.Linear(dim, dim)
+        self.out = nn.Sequential(nn.Linear(dim, dim), nn.Dropout(dropout))
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        # tokens: [B, T, N, D]
+        batch, time, num_tokens, dim = tokens.shape
+        if num_tokens <= 1 or self.neighbors <= 0:
+            return tokens
+        flat = tokens.reshape(batch * time, num_tokens, dim)
+        normalized = self.norm(flat)
+        query = self.q(normalized)
+        key = self.k(normalized)
+        value = self.v(normalized)
+        scores = torch.matmul(query, key.transpose(1, 2)) / math.sqrt(dim)
+        eye = torch.eye(num_tokens, device=tokens.device, dtype=torch.bool)[None, :, :]
+        scores = scores.masked_fill(eye, torch.finfo(scores.dtype).min)
+        neighbor_count = min(self.neighbors, num_tokens - 1)
+        top_scores, top_indices = torch.topk(scores, k=neighbor_count, dim=-1)
+        weights = torch.softmax(top_scores, dim=-1)
+        expanded_value = value[:, None, :, :].expand(-1, num_tokens, -1, -1)
+        gather_index = top_indices[..., None].expand(-1, -1, -1, dim)
+        neighbors = torch.gather(expanded_value, dim=2, index=gather_index)
+        context = (weights[..., None] * neighbors).sum(dim=2)
+        aggregated = flat + self.out(context)
+        return aggregated.reshape(batch, time, num_tokens, dim)
+
+
+class TemporalDifferenceConv(nn.Module):
+    """Multi-resolution temporal difference mixing for each spatial token."""
+
+    def __init__(
+        self,
+        dim: int,
+        dilations: tuple[int, ...] = (1, 2),
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        self.dilations = dilations
+        self.norm = nn.LayerNorm(dim)
+        self.mix = nn.Sequential(
+            nn.Conv1d(dim * (len(dilations) + 1), dim, kernel_size=1),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Conv1d(dim, dim, kernel_size=1),
+        )
+
+    @staticmethod
+    def _difference(sequence: torch.Tensor, dilation: int) -> torch.Tensor:
+        if sequence.shape[1] <= dilation:
+            shifted = sequence[:, :1, :].expand(-1, sequence.shape[1], -1)
+        else:
+            prefix = sequence[:, :1, :].expand(-1, dilation, -1)
+            shifted = torch.cat([prefix, sequence[:, :-dilation, :]], dim=1)
+        return sequence - shifted
+
+    def forward(self, sequence: torch.Tensor) -> torch.Tensor:
+        # sequence: [B*N, T, D]
+        normalized = self.norm(sequence)
+        features = [normalized.transpose(1, 2)]
+        for dilation in self.dilations:
+            features.append(self._difference(normalized, dilation).transpose(1, 2))
+        mixed = self.mix(torch.cat(features, dim=1)).transpose(1, 2)
+        return sequence + mixed
+
+
 class TemporalAdapter(nn.Module):
     def __init__(
         self,
@@ -105,10 +179,12 @@ class TemporalAdapter(nn.Module):
         layers: int = 1,
         heads: int = 4,
         dropout: float = 0.1,
+        use_difference_conv: bool = False,
     ) -> None:
         super().__init__()
         self.temporal_type = temporal_type
         self.position = TemporalPositionalEncoding(dim)
+        self.difference_conv = TemporalDifferenceConv(dim, dropout=dropout) if use_difference_conv else nn.Identity()
         if temporal_type == "transformer":
             layer = nn.TransformerEncoderLayer(
                 d_model=dim,
@@ -133,6 +209,7 @@ class TemporalAdapter(nn.Module):
             temporal, _h = self.module(per_spatial_token)
         else:
             temporal = self.module(per_spatial_token)
+        temporal = self.difference_conv(temporal)
         temporal = temporal.reshape(batch, num_tokens, time, dim).permute(0, 2, 1, 3)
         return tokens + temporal
 
@@ -176,6 +253,80 @@ class LearnedCueTokenSelector(nn.Module):
             cues = layer["norm1"](cues + layer["dropout"](attended))
             cues = layer["norm2"](cues + layer["dropout"](layer["ffn"](cues)))
         return cues
+
+
+class TopKTokenLearnerSelector(nn.Module):
+    """Input-adaptive cue token mining with score-gated Top-K selection."""
+
+    def __init__(
+        self,
+        dim: int,
+        num_cue_tokens: int = 8,
+        layers: int = 1,
+        heads: int = 4,
+        dropout: float = 0.1,
+    ) -> None:
+        super().__init__()
+        self.num_cue_tokens = num_cue_tokens
+        hidden = max(dim // 2, 1)
+        self.score = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, hidden),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden, 1),
+        )
+        self.layers = nn.ModuleList(
+            [
+                nn.ModuleDict(
+                    {
+                        "attn": nn.MultiheadAttention(dim, heads, batch_first=True),
+                        "norm1": nn.LayerNorm(dim),
+                        "ffn": nn.Sequential(
+                            nn.Linear(dim, dim * 4),
+                            nn.GELU(),
+                            nn.Linear(dim * 4, dim),
+                        ),
+                        "dropout": nn.Dropout(dropout),
+                        "norm2": nn.LayerNorm(dim),
+                    }
+                )
+                for _ in range(layers)
+            ]
+        )
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        # tokens: [B, N, D]
+        batch, num_tokens, dim = tokens.shape
+        cue_count = min(self.num_cue_tokens, num_tokens)
+        scores = self.score(tokens).squeeze(-1)
+        top_scores, top_indices = torch.topk(scores, k=cue_count, dim=1)
+        selected = torch.gather(tokens, dim=1, index=top_indices[..., None].expand(-1, -1, dim))
+        selected = selected * torch.sigmoid(top_scores[..., None])
+        for layer in self.layers:
+            attended, _weights = layer["attn"](selected, selected, selected, need_weights=False)
+            selected = layer["norm1"](selected + layer["dropout"](attended))
+            selected = layer["norm2"](selected + layer["dropout"](layer["ffn"](selected)))
+        if cue_count == self.num_cue_tokens:
+            return selected
+        padding = selected.new_zeros(batch, self.num_cue_tokens - cue_count, dim)
+        return torch.cat([selected, padding], dim=1)
+
+
+def build_cue_selector(
+    selector_type: str,
+    dim: int,
+    num_cue_tokens: int,
+    layers: int,
+    heads: int = 4,
+    dropout: float = 0.1,
+) -> nn.Module:
+    normalized = selector_type.lower()
+    if normalized in {"query_attention", "learned_query", "query"}:
+        return LearnedCueTokenSelector(dim, num_cue_tokens, layers, heads, dropout)
+    if normalized in {"topk_tokenlearner", "tokenlearner", "topk"}:
+        return TopKTokenLearnerSelector(dim, num_cue_tokens, layers, heads, dropout)
+    raise ValueError(f"Unknown selector_type: {selector_type}")
 
 
 class CueMemoryBank(nn.Module):
@@ -277,6 +428,10 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
         temporal_layers: int = 1,
         num_cue_tokens: int = 8,
         selector_layers: int = 1,
+        selector_type: str = "query_attention",
+        use_spatial_graph: bool = False,
+        spatial_graph_neighbors: int = 8,
+        use_temporal_difference_conv: bool = False,
         decoder_layers: int = 1,
         dropout: float = 0.1,
         use_constant_velocity_residual: bool = True,
@@ -296,13 +451,20 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             if use_bottleneck_adapters
             else nn.Identity()
         )
+        self.spatial_graph = (
+            DynamicSpatialGraphAggregator(hidden_dim, spatial_graph_neighbors, dropout=dropout)
+            if use_spatial_graph
+            else nn.Identity()
+        )
         self.temporal = TemporalAdapter(
             hidden_dim,
             temporal_type=temporal_type,
             layers=temporal_layers,
             dropout=dropout,
+            use_difference_conv=use_temporal_difference_conv,
         )
-        self.selector = LearnedCueTokenSelector(
+        self.selector = build_cue_selector(
+            selector_type,
             hidden_dim,
             num_cue_tokens,
             selector_layers,
@@ -323,6 +485,7 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
         tokens = self.input_projection(tokens)
         tokens = self.spatial_position(tokens)
         tokens = self.adapter(tokens)
+        tokens = self.spatial_graph(tokens)
         tokens = self.temporal(tokens)
         cues = []
         for t in range(tokens.shape[1]):

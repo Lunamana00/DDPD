@@ -15,6 +15,10 @@ temporal_layers: 1
 num_cue_tokens: 8
 num_modes: 1
 selector_layers: 1
+selector_type: topk_tokenlearner
+use_spatial_graph: true
+spatial_graph_neighbors: 8
+use_temporal_difference_conv: true
 memory_update: gru_cell
 loss: huber
 trajectory_scale: auto

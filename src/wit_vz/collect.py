@@ -332,6 +332,8 @@ def main() -> None:
     manifest = {
         "run_id": run_id,
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "source_dataset": "wit_vz",
+        "env_name": "vizdoom",
         "scenario": args.scenario,
         "map": args.map,
         "fps": game_context["doom_tics_per_second"],

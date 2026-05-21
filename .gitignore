@@ -26,10 +26,13 @@ htmlcov/
 data/*
 !data/wit_vz/
 data/wit_vz/*
+!data/wit_vz/raw/
 !data/wit_vz/processed/
 !data/wit_vz/feature_cache/
+data/wit_vz/raw/*
 data/wit_vz/processed/*
 data/wit_vz/feature_cache/*
+!data/wit_vz/raw/*.dvc
 !data/wit_vz/processed/*.dvc
 !data/wit_vz/feature_cache/*.dvc
 outputs/

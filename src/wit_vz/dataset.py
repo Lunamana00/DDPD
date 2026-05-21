@@ -34,11 +34,8 @@ class WITVZPathDataset(Dataset):
     ) -> None:
         self.dataset_dir = Path(dataset_dir)
         self.manifest = load_json(self.dataset_dir / "dataset_manifest.json")
-        self.raw_dir = Path(self.manifest["raw_dir"])
-        if not self.raw_dir.is_absolute():
-            self.raw_dir = (self.dataset_dir / self.raw_dir).resolve()
-            if not self.raw_dir.exists():
-                self.raw_dir = Path(self.manifest["raw_dir"]).resolve()
+        self.raw_dirs = self._load_raw_dirs()
+        self.raw_dir = next(iter(self.raw_dirs.values()))
         self.image_size = image_size
         self.load_rgb = load_rgb
         self.visual_feature_cache_dir = (
@@ -55,12 +52,35 @@ class WITVZPathDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
-    def _resolve_raw_path(self, rel_path: str | None) -> Path | None:
-        if rel_path is None:
-            return None
-        path = Path(rel_path)
+    def _resolve_raw_root(self, raw_dir: str | Path) -> Path:
+        path = Path(raw_dir)
         if path.is_absolute():
             return path
+        candidate = (self.dataset_dir / path).resolve()
+        if candidate.exists():
+            return candidate
+        return path.resolve()
+
+    def _load_raw_dirs(self) -> dict[str, Path]:
+        if "raw_dirs" in self.manifest:
+            return {
+                str(source_id): self._resolve_raw_root(raw_dir)
+                for source_id, raw_dir in self.manifest["raw_dirs"].items()
+            }
+        return {"default": self._resolve_raw_root(self.manifest["raw_dir"])}
+
+    def _resolve_raw_path(self, rel_path: str | None, source_id: str | None = None) -> Path | None:
+        if rel_path is None:
+            return None
+        selected_source_id = source_id
+        rel = rel_path
+        if "::" in rel_path:
+            selected_source_id, rel = rel_path.split("::", 1)
+        path = Path(rel)
+        if path.is_absolute():
+            return path
+        if selected_source_id is not None and selected_source_id in self.raw_dirs:
+            return self.raw_dirs[selected_source_id] / path
         return self.raw_dir / path
 
     def __getitem__(self, index: int) -> dict[str, Any]:
@@ -72,12 +92,18 @@ class WITVZPathDataset(Dataset):
             "ego_history": torch.tensor(sample["relative_egomotion_history"], dtype=torch.float32),
             "future_path": torch.tensor(sample["future_local_path"], dtype=torch.float32),
             "metadata": sample.get("metadata", {}),
+            "source": sample.get("source", {}),
             "current_pose": sample.get("current_pose"),
             "rgb_history_paths": sample["rgb_history_paths"],
         }
+        source_id = (
+            item["source"].get("source_id")
+            or item["metadata"].get("source_id")
+            or None
+        )
         if self.load_rgb:
             frames = [
-                load_rgb_tensor(self._resolve_raw_path(path), self.image_size)
+                load_rgb_tensor(self._resolve_raw_path(path, source_id), self.image_size)
                 for path in sample["rgb_history_paths"]
             ]
             item["rgb_history"] = torch.stack(frames, dim=0)
@@ -102,6 +128,7 @@ def collate_path_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
         "ego_history": torch.stack([item["ego_history"] for item in batch], dim=0),
         "future_path": torch.stack([item["future_path"] for item in batch], dim=0),
         "metadata": [item["metadata"] for item in batch],
+        "source": [item["source"] for item in batch],
         "current_pose": [item["current_pose"] for item in batch],
         "rgb_history_paths": [item["rgb_history_paths"] for item in batch],
     }

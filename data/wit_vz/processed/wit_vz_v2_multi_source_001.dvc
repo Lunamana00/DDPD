@@ -1,0 +1,6 @@
+outs:
+- md5: 4fb246a5b4f763acd9959de49ccfb6d6.dir
+  size: 74009503
+  nfiles: 11
+  hash: md5
+  path: wit_vz_v2_multi_source_001

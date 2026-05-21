@@ -1,0 +1,40 @@
+runs:
+  - scenario: deadly_corridor
+    map: map01
+    run_id: wit_vz_v2_deadly_corridor_001
+    episodes: 60
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: corridor
+    save_rgb: true
+    save_depth: false
+    save_labels: false
+    save_automap: false
+    seed: 201
+  - scenario: health_gathering
+    map: map01
+    run_id: wit_vz_v2_health_gathering_001
+    episodes: 60
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: corridor
+    save_rgb: true
+    save_depth: false
+    save_labels: false
+    save_automap: false
+    seed: 202
+  - scenario: my_way_home
+    map: map01
+    run_id: wit_vz_v2_my_way_home_001
+    episodes: 60
+    max_steps: 600
+    frame_skip: 4
+    mode: scripted
+    policy: corridor
+    save_rgb: true
+    save_depth: false
+    save_labels: false
+    save_automap: false
+    seed: 203

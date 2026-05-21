@@ -1,0 +1,6 @@
+outs:
+- md5: f86a414f521ccd910d9807d04de48463.dir
+  size: 64180642
+  nfiles: 7321
+  hash: md5
+  path: wit_vz_v2_health_gathering_001

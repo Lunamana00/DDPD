@@ -1,0 +1,17 @@
+candidate_sources:
+  - env_name: vizdoom
+    priority: 1
+    status: implemented
+    reason: Current lightweight first-person game source; collect more maps/scenarios first.
+  - env_name: ai2thor
+    priority: 2
+    status: adapter_schema_ready
+    reason: First-person indoor embodied navigation with controllable agent pose.
+  - env_name: habitat
+    priority: 3
+    status: adapter_schema_ready
+    reason: Large indoor scene diversity through HM3D/Replica-style assets, but requires licensed assets.
+  - env_name: deepmind_lab
+    priority: 4
+    status: adapter_schema_ready
+    reason: Game-like first-person 3D navigation, but Windows collection is less direct.

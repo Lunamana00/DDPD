@@ -21,13 +21,32 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def resolve_raw_path(dataset_dir: Path, rel_path: str) -> Path:
+def resolve_raw_root(dataset_dir: Path, raw_dir: str | Path) -> Path:
+    path = Path(raw_dir)
+    if path.is_absolute():
+        return path
+    candidate = dataset_dir / path
+    if candidate.exists():
+        return candidate
+    return path
+
+
+def resolve_raw_path(dataset_dir: Path, rel_path: str, source_id: str | None = None) -> Path:
     manifest = load_json(dataset_dir / "dataset_manifest.json")
-    raw_dir = Path(manifest["raw_dir"])
-    if not raw_dir.is_absolute():
-        candidate = dataset_dir / raw_dir
-        raw_dir = candidate if candidate.exists() else raw_dir
-    return raw_dir / rel_path
+    raw_dirs = {
+        str(key): resolve_raw_root(dataset_dir, value)
+        for key, value in manifest.get("raw_dirs", {"default": manifest["raw_dir"]}).items()
+    }
+    selected_source_id = source_id
+    rel = rel_path
+    if "::" in rel_path:
+        selected_source_id, rel = rel_path.split("::", 1)
+    path = Path(rel)
+    if path.is_absolute():
+        return path
+    if selected_source_id is not None and selected_source_id in raw_dirs:
+        return raw_dirs[selected_source_id] / path
+    return next(iter(raw_dirs.values())) / path
 
 
 def path_panel(pred: list[list[float]], gt: list[list[float]], size: int = 360) -> Image.Image:
@@ -78,7 +97,8 @@ def main() -> None:
     figure_paths = []
     for i, pred_item in enumerate(predictions[: args.num_samples], start=1):
         sample = samples[pred_item["sample_id"]]
-        frame_path = resolve_raw_path(args.dataset, sample["rgb_history_paths"][-1])
+        source_id = sample.get("source", {}).get("source_id") or sample.get("metadata", {}).get("source_id")
+        frame_path = resolve_raw_path(args.dataset, sample["rgb_history_paths"][-1], source_id)
         frame = Image.open(frame_path).convert("RGB").resize((360, 270))
         pred = pred_item["prediction"]
         gt = sample["future_local_path"]

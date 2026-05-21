@@ -80,3 +80,49 @@ def test_processed_dataset_sample_shapes(tmp_path):
 
     batch = collate_path_batch([cached_item, cached_item])
     assert batch["visual_tokens"].shape == (2, 3, 4, 8)
+
+
+def test_processed_dataset_resolves_source_prefixed_raw_paths(tmp_path):
+    raw = tmp_path / "raw" / "source_a"
+    frame_dir = raw / "episodes" / "episode_000001" / "frames"
+    frame_dir.mkdir(parents=True)
+    for idx in range(2):
+        Image.new("RGB", (32, 24), (idx * 60, 0, 0)).save(frame_dir / f"{idx:06d}.png")
+
+    processed = tmp_path / "processed" / "multi"
+    write_json(
+        processed / "dataset_manifest.json",
+        {
+            "raw_dir": raw.as_posix(),
+            "raw_dirs": {"source_a": raw.as_posix()},
+            "history_frames": 2,
+            "future_steps": 1,
+            "num_samples": 1,
+        },
+    )
+    write_json(processed / "splits.json", {"train": ["source_a__s1"], "val": [], "test": []})
+    write_jsonl(
+        processed / "samples.jsonl",
+        [
+            {
+                "sample_id": "source_a__s1",
+                "episode_id": "source_a__episode_000001",
+                "center_step": 1,
+                "source": {"source_id": "source_a", "env_name": "vizdoom"},
+                "rgb_history_paths": [
+                    "source_a::episodes/episode_000001/frames/000000.png",
+                    "source_a::episodes/episode_000001/frames/000001.png",
+                ],
+                "relative_egomotion_history": [[0, 0, 0], [1, 0, 0]],
+                "future_local_path": [[1, 0]],
+                "future_world_path": [{"x": 1, "y": 0}],
+                "current_pose": {"x": 0, "y": 0, "angle": 0},
+                "metadata": {"source_id": "source_a"},
+            }
+        ],
+    )
+
+    dataset = WITVZPathDataset(processed, split="train", image_size=16)
+    item = dataset[0]
+    assert item["source"]["source_id"] == "source_a"
+    assert item["rgb_history"].shape == (2, 3, 16, 16)

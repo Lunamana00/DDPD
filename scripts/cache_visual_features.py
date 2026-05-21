@@ -40,21 +40,40 @@ def choose_device(requested: str) -> torch.device:
     return torch.device(requested)
 
 
-def resolve_raw_dir(dataset_dir: Path, manifest: dict[str, Any]) -> Path:
-    raw_dir = Path(manifest["raw_dir"])
-    if raw_dir.is_absolute():
-        return raw_dir
-    candidate = (dataset_dir / raw_dir).resolve()
-    if candidate.exists():
-        return candidate
-    return raw_dir.resolve()
-
-
-def resolve_raw_path(raw_dir: Path, rel_path: str) -> Path:
-    path = Path(rel_path)
+def resolve_raw_root(dataset_dir: Path, raw_dir: str | Path) -> Path:
+    path = Path(raw_dir)
     if path.is_absolute():
         return path
-    return raw_dir / path
+    candidate = (dataset_dir / path).resolve()
+    if candidate.exists():
+        return candidate
+    return path.resolve()
+
+
+def resolve_raw_dirs(dataset_dir: Path, manifest: dict[str, Any]) -> dict[str, Path]:
+    if "raw_dirs" in manifest:
+        return {
+            str(source_id): resolve_raw_root(dataset_dir, raw_dir)
+            for source_id, raw_dir in manifest["raw_dirs"].items()
+        }
+    return {"default": resolve_raw_root(dataset_dir, manifest["raw_dir"])}
+
+
+def resolve_raw_path(
+    raw_dirs: dict[str, Path],
+    rel_path: str,
+    source_id: str | None = None,
+) -> Path:
+    selected_source_id = source_id
+    rel = rel_path
+    if "::" in rel_path:
+        selected_source_id, rel = rel_path.split("::", 1)
+    path = Path(rel)
+    if path.is_absolute():
+        return path
+    if selected_source_id is not None and selected_source_id in raw_dirs:
+        return raw_dirs[selected_source_id] / path
+    return next(iter(raw_dirs.values())) / path
 
 
 def save_manifest(
@@ -85,7 +104,7 @@ def main() -> None:
 
     device = choose_device(args.device)
     dataset_manifest = load_json(args.dataset / "dataset_manifest.json")
-    raw_dir = resolve_raw_dir(args.dataset, dataset_manifest)
+    raw_dirs = resolve_raw_dirs(args.dataset, dataset_manifest)
     samples = read_jsonl(args.dataset / "samples.jsonl")
     if args.limit > 0:
         samples = samples[: args.limit]
@@ -104,8 +123,9 @@ def main() -> None:
             return
         histories = []
         for sample in batch_samples:
+            source_id = sample.get("source", {}).get("source_id") or sample.get("metadata", {}).get("source_id")
             frames = [
-                load_rgb_tensor(resolve_raw_path(raw_dir, rel_path), args.image_size)
+                load_rgb_tensor(resolve_raw_path(raw_dirs, rel_path, source_id), args.image_size)
                 for rel_path in sample["rgb_history_paths"]
             ]
             histories.append(torch.stack(frames, dim=0))

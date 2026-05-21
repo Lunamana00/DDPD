@@ -36,6 +36,7 @@ Training and evaluation:
 - `src/eval_path_predictor.py`: checkpoint evaluation.
 - `src/compare_models.py`: Markdown comparison table generation.
 - `src/visualize_path_predictions.py`: prediction-vs-ground-truth visualization.
+- `src/visualize_vizdoom_replay.py`: animated ViZDoom RGB replay with predicted and GT local paths, without Unity.
 - `src/metrics.py`: ADE, FDE, per-horizon error.
 - `src/losses.py`: trajectory losses.
 

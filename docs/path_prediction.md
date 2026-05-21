@@ -218,6 +218,28 @@ Each figure shows:
 - forward/right axes
 - ADE/FDE
 
+For a Unity-free moving demo, render an animated ViZDoom replay from the same
+processed samples and prediction dump:
+
+```powershell
+uv run python -m src.visualize_vizdoom_replay `
+  --dataset data/wit_vz/processed/wit_vz_mini_001 `
+  --predictions runs/cue_memory_residual/eval/predictions.jsonl `
+  --out runs/cue_memory_residual/figures/vizdoom_path_replay.gif `
+  --num-frames 120 `
+  --fps 8
+```
+
+The replay uses the recorded ViZDoom egocentric RGB frame as the left pane and
+updates a local trajectory pane on the right:
+
+- green: ground-truth future local path
+- blue: model-predicted future local path
+- black marker: current player pose in local coordinates
+
+This is the recommended demo path before adding a closed-loop controller that
+tries to make the ViZDoom agent follow the predicted waypoints.
+
 ## Compare Runs
 
 ```powershell

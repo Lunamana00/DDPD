@@ -38,6 +38,15 @@ data/wit_vz/feature_cache/*
 outputs/
 _vizdoom.ini
 
+# Unity generated folders. Keep Assets, Packages, and ProjectSettings tracked.
+client/**/Library/
+client/**/Temp/
+client/**/Obj/
+client/**/Build/
+client/**/Builds/
+client/**/Logs/
+client/**/UserSettings/
+
 # Training artifacts that are reproducible and noisy in Git.
 *.pt
 *.pth

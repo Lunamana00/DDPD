@@ -13,6 +13,7 @@ uvcache/
 .dvc-config-home/
 .dvc-site-cache/
 .dvc-gdrive/
+.drive-ddpd/
 .hf-cache*/
 .git.blocked.bak/
 .git.protected.bak/

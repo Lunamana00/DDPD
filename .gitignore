@@ -10,6 +10,7 @@ uvcache/
 .dvc-config-home/
 .dvc-site-cache/
 .dvc-gdrive/
+.drive-ddpd/
 pytest-cache-files-*/
 .codex-test-tmp/
 .codex-git/

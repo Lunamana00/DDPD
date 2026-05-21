@@ -33,14 +33,16 @@ That is the schema expected by `src.wit_vz.build_samples`.
 
 Each episode is seed-generated with:
 
-- high-contrast wall panels and floor cues
-- colored landmarks, beacons, and crates
-- obstacles placed near but not exactly on the route
+- enclosed dungeon-like corridors with darker walls and ceiling ribs
+- branch doors, false doors, and color-coded turn cue panels
+- floor arrows before turn decisions
+- pickups, crates, hazard-like props, and enemy silhouettes
 - a route-following camera agent
 - no explicit ground-truth route line unless `Show Debug Route Line` is enabled
 
-The point is to make RGB frames contain route-relevant visual cues while keeping
-labels reproducible.
+The point is not photorealism. The point is to make RGB frames contain
+route-relevant visual cues before the ego-motion history alone reveals the
+upcoming turn, while keeping labels reproducible.
 
 ## Editor Usage
 
@@ -54,7 +56,7 @@ DDPD > Generate Unity Raw Dataset
 This writes directly to:
 
 ```text
-data/wit_vz/raw/unity_procedural_001
+data/wit_vz/raw/unity_game_synthetic_001
 ```
 
 Manual setup is still possible:
@@ -88,12 +90,12 @@ From the repo root on Windows:
 ```
 
 This runs Unity in batch mode, writes the raw run to
-`data/wit_vz/raw/unity_procedural_001`, checks `manifest.json`, then runs:
+`data/wit_vz/raw/unity_game_synthetic_001`, checks `manifest.json`, then runs:
 
 ```bash
 python -m src.wit_vz.build_samples \
-  --raw data/wit_vz/raw/unity_procedural_001 \
-  --out data/wit_vz/processed/unity_procedural_001 \
+  --raw data/wit_vz/raw/unity_game_synthetic_001 \
+  --out data/wit_vz/processed/unity_game_synthetic_001 \
   --history-sec 1 \
   --future-sec 3 \
   --sample-fps 5 \
@@ -105,7 +107,7 @@ The script accepts overrides:
 
 ```powershell
 .\scripts\generate_unity_dataset.ps1 `
-  -RunId unity_procedural_002 `
+  -RunId unity_game_synthetic_002 `
   -Episodes 12 `
   -FramesPerEpisode 260 `
   -CaptureSize 160

@@ -1,0 +1,63 @@
+{
+  "dataset_id": "wit_vz_game_benchmark_001",
+  "raw_root": "data/wit_vz/raw",
+  "processed_out": "data/wit_vz/processed/wit_vz_game_benchmark_001",
+  "history_sec": 1.0,
+  "future_sec": 1.0,
+  "sample_fps": 5.0,
+  "stride": 1,
+  "split": "episode",
+  "seed": 301,
+  "runs": [
+    {
+      "scenario": "deadly_corridor",
+      "map": "map01",
+      "run_id": "wit_vz_game_deadly_corridor_corridor_001",
+      "episodes": 120,
+      "max_steps": 900,
+      "frame_skip": 4,
+      "policy": "corridor",
+      "seed": 301
+    },
+    {
+      "scenario": "deadly_corridor",
+      "map": "map01",
+      "run_id": "wit_vz_game_deadly_corridor_random_001",
+      "episodes": 80,
+      "max_steps": 900,
+      "frame_skip": 4,
+      "policy": "random",
+      "seed": 302
+    },
+    {
+      "scenario": "health_gathering",
+      "map": "map01",
+      "run_id": "wit_vz_game_health_gathering_001",
+      "episodes": 100,
+      "max_steps": 800,
+      "frame_skip": 4,
+      "policy": "corridor",
+      "seed": 303
+    },
+    {
+      "scenario": "my_way_home",
+      "map": "map01",
+      "run_id": "wit_vz_game_my_way_home_001",
+      "episodes": 100,
+      "max_steps": 800,
+      "frame_skip": 4,
+      "policy": "corridor",
+      "seed": 304
+    },
+    {
+      "scenario": "take_cover",
+      "map": "map01",
+      "run_id": "wit_vz_game_take_cover_001",
+      "episodes": 80,
+      "max_steps": 800,
+      "frame_skip": 4,
+      "policy": "random",
+      "seed": 305
+    }
+  ]
+}

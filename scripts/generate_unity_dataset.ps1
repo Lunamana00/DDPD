@@ -1,6 +1,6 @@
 param(
     [string]$UnityPath = "C:\Program Files\Unity\Hub\Editor\6000.3.11f1\Editor\Unity.exe",
-    [string]$RunId = "unity_procedural_001",
+    [string]$RunId = "unity_game_synthetic_001",
     [int]$Episodes = 4,
     [int]$FramesPerEpisode = 180,
     [int]$CaptureSize = 128,

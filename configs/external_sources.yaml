@@ -5,13 +5,17 @@ candidate_sources:
     reason: Current lightweight first-person game source; collect more maps/scenarios first.
   - env_name: ai2thor
     priority: 2
-    status: adapter_schema_ready
-    reason: First-person indoor embodied navigation with controllable agent pose.
-  - env_name: habitat
+    status: collector_scaffolded
+    reason: First-person Unity indoor embodied navigation with RGB frames and controllable agent pose.
+  - env_name: procthor
     priority: 3
+    status: planned_ai2thor_extension
+    reason: Procedural houses through the AI2-THOR ecosystem; best source for larger Unity-like diversity.
+  - env_name: habitat
+    priority: 4
     status: adapter_schema_ready
     reason: Large indoor scene diversity through HM3D/Replica-style assets, but requires licensed assets.
   - env_name: deepmind_lab
-    priority: 4
+    priority: 5
     status: adapter_schema_ready
     reason: Game-like first-person 3D navigation, but Windows collection is less direct.

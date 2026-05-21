@@ -25,6 +25,9 @@ server = [
 vizdoom = [
     "vizdoom>=1.2",
 ]
+ai2thor = [
+    "ai2thor>=5.0",
+]
 
 [dependency-groups]
 dev = [

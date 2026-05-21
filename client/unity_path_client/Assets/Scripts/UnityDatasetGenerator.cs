@@ -10,7 +10,7 @@ public class UnityDatasetGenerator : MonoBehaviour
 {
     [Header("Output")]
     [SerializeField] private bool generateOnStart;
-    [SerializeField] private string runId = "unity_procedural_001";
+    [SerializeField] private string runId = "unity_game_synthetic_001";
     [SerializeField] private string outputRoot = "DDPDUnityDataset";
     [SerializeField] private bool usePersistentDataPath = true;
     [SerializeField] private bool overwriteExistingRun = true;
@@ -31,6 +31,7 @@ public class UnityDatasetGenerator : MonoBehaviour
     [SerializeField] private float waypointSpacingMax = 7.0f;
     [SerializeField] private float laneWidth = 2.2f;
     [SerializeField] private float corridorHalfWidth = 5.4f;
+    [SerializeField] private bool gameLikeScene = true;
     [SerializeField] private bool showDebugRouteLine;
     [SerializeField] private bool quitAfterGeneration;
 
@@ -266,6 +267,11 @@ public class UnityDatasetGenerator : MonoBehaviour
 
     private List<Vector3> GenerateRoute(System.Random rng)
     {
+        if (gameLikeScene)
+        {
+            return GenerateGameLikeRoute(rng);
+        }
+
         List<Vector3> route = new List<Vector3>();
         int lane = 0;
         float z = 1.5f;
@@ -283,6 +289,37 @@ public class UnityDatasetGenerator : MonoBehaviour
         return route;
     }
 
+    private List<Vector3> GenerateGameLikeRoute(System.Random rng)
+    {
+        List<Vector3> route = new List<Vector3>();
+        int lane = 0;
+        float z = 1.5f;
+        route.Add(new Vector3(0.0f, 1.0f, z));
+
+        for (int i = 1; i < routeWaypoints; i++)
+        {
+            int direction = 0;
+            if (i % 2 == 0 || rng.NextDouble() < 0.35)
+            {
+                direction = rng.NextDouble() < 0.5 ? -1 : 1;
+            }
+            if (lane <= -2)
+            {
+                direction = 1;
+            }
+            else if (lane >= 2)
+            {
+                direction = -1;
+            }
+            lane = Mathf.Clamp(lane + direction, -2, 2);
+            float x = lane * laneWidth + RandomRange(rng, -0.25f, 0.25f);
+            z += RandomRange(rng, waypointSpacingMin + 1.5f, waypointSpacingMax + 2.0f);
+            route.Add(new Vector3(x, 1.0f, z));
+        }
+
+        return route;
+    }
+
     private void BuildScene(List<Vector3> route, System.Random rng)
     {
         if (generatedRoot != null)
@@ -294,12 +331,24 @@ public class UnityDatasetGenerator : MonoBehaviour
 
         float length = route[route.Count - 1].z + 8.0f;
         CreateBox("Floor", new Vector3(0.0f, -0.04f, length * 0.5f), new Vector3(corridorHalfWidth * 2.0f, 0.08f, length), palette[0]);
-        CreateBox("LeftWall", new Vector3(-corridorHalfWidth, 1.2f, length * 0.5f), new Vector3(0.25f, 2.4f, length), palette[1]);
-        CreateBox("RightWall", new Vector3(corridorHalfWidth, 1.2f, length * 0.5f), new Vector3(0.25f, 2.4f, length), palette[1]);
+        CreateBox("LeftWall", new Vector3(-corridorHalfWidth, 1.25f, length * 0.5f), new Vector3(0.25f, 2.5f, length), palette[1]);
+        CreateBox("RightWall", new Vector3(corridorHalfWidth, 1.25f, length * 0.5f), new Vector3(0.25f, 2.5f, length), palette[1]);
 
-        CreateGrid(length);
-        CreateLandmarks(route, rng);
-        CreateObstacles(route, rng);
+        if (gameLikeScene)
+        {
+            CreateBox("LowCeiling", new Vector3(0.0f, 2.55f, length * 0.5f), new Vector3(corridorHalfWidth * 2.0f, 0.15f, length), palette[1]);
+            CreateGameWallPanels(length, rng);
+            CreateDecisionCues(route, rng);
+            CreateGameProps(route, rng);
+            CreateLocalLights(route, rng);
+        }
+        else
+        {
+            CreateGrid(length);
+            CreateLandmarks(route, rng);
+            CreateObstacles(route, rng);
+        }
+
         if (showDebugRouteLine)
         {
             CreateRouteLine(route);
@@ -309,7 +358,7 @@ public class UnityDatasetGenerator : MonoBehaviour
         lightObject.transform.SetParent(generatedRoot.transform, false);
         Light light = lightObject.AddComponent<Light>();
         light.type = LightType.Directional;
-        light.intensity = 1.1f;
+        light.intensity = gameLikeScene ? 0.45f : 1.1f;
         lightObject.transform.rotation = Quaternion.Euler(55.0f, -35.0f, 0.0f);
     }
 
@@ -389,6 +438,137 @@ public class UnityDatasetGenerator : MonoBehaviour
         }
     }
 
+    private void CreateGameWallPanels(float length, System.Random rng)
+    {
+        for (float z = 1.5f; z < length - 1.0f; z += 3.2f)
+        {
+            Material trim = palette[2 + rng.Next(palette.Length - 2)];
+            CreateBox("LeftMetalPanel", new Vector3(-corridorHalfWidth + 0.13f, 1.35f, z), new Vector3(0.06f, 1.4f, 1.5f), trim);
+            CreateBox("RightMetalPanel", new Vector3(corridorHalfWidth - 0.13f, 1.35f, z + 1.4f), new Vector3(0.06f, 1.4f, 1.5f), trim);
+            CreateBox("CeilingRib", new Vector3(0.0f, 2.42f, z), new Vector3(corridorHalfWidth * 2.0f, 0.08f, 0.12f), palette[7]);
+            CreateBox("FloorPlate", new Vector3(0.0f, 0.01f, z), new Vector3(corridorHalfWidth * 2.0f - 0.5f, 0.025f, 0.08f), palette[7]);
+        }
+    }
+
+    private void CreateDecisionCues(List<Vector3> route, System.Random rng)
+    {
+        for (int i = 1; i < route.Count - 1; i++)
+        {
+            float deltaX = route[i + 1].x - route[i].x;
+            if (Mathf.Abs(deltaX) < 0.45f)
+            {
+                continue;
+            }
+
+            float turnSide = Mathf.Sign(deltaX);
+            Material routeCue = turnSide < 0.0f ? palette[3] : palette[4];
+            Material distractorCue = turnSide < 0.0f ? palette[4] : palette[3];
+            Vector3 point = route[i];
+            Vector3 previous = route[i - 1];
+            Vector3 direction = (point - previous).normalized;
+            Vector3 cueCenter = point - direction * RandomRange(rng, 1.4f, 2.2f);
+
+            CreateBox(
+                $"DecisionCue_Target_{i:00}",
+                new Vector3(turnSide * (corridorHalfWidth - 0.16f), 1.55f, cueCenter.z),
+                new Vector3(0.08f, 0.75f, 1.0f),
+                routeCue
+            );
+            CreateBox(
+                $"DecisionCue_Distractor_{i:00}",
+                new Vector3(-turnSide * (corridorHalfWidth - 0.16f), 1.55f, cueCenter.z),
+                new Vector3(0.08f, 0.45f, 0.65f),
+                distractorCue
+            );
+            CreateArrowCue($"FloorArrow_{i:00}", new Vector3(point.x, 0.035f, cueCenter.z), turnSide, routeCue);
+            CreateBranchDoor($"TrueBranchDoor_{i:00}", point, turnSide, routeCue);
+            CreateBranchDoor($"FalseBranchDoor_{i:00}", point + direction * RandomRange(rng, 0.8f, 1.5f), -turnSide, distractorCue);
+        }
+    }
+
+    private void CreateBranchDoor(string objectName, Vector3 point, float side, Material accent)
+    {
+        float wallX = side * (corridorHalfWidth - 0.10f);
+        CreateBox(objectName + "_Void", new Vector3(wallX, 1.1f, point.z), new Vector3(0.07f, 1.65f, 1.65f), palette[0]);
+        CreateBox(objectName + "_TopFrame", new Vector3(wallX, 1.95f, point.z), new Vector3(0.09f, 0.15f, 1.9f), accent);
+        CreateBox(objectName + "_BottomFrame", new Vector3(wallX, 0.28f, point.z), new Vector3(0.09f, 0.12f, 1.9f), accent);
+        CreateBox(objectName + "_SideFrameA", new Vector3(wallX, 1.1f, point.z - 0.86f), new Vector3(0.09f, 1.6f, 0.12f), accent);
+        CreateBox(objectName + "_SideFrameB", new Vector3(wallX, 1.1f, point.z + 0.86f), new Vector3(0.09f, 1.6f, 0.12f), accent);
+    }
+
+    private void CreateArrowCue(string objectName, Vector3 center, float side, Material material)
+    {
+        CreateBox(objectName + "_Shaft", center, new Vector3(0.22f, 0.025f, 1.15f), material, Quaternion.Euler(0.0f, side * 28.0f, 0.0f));
+        CreateBox(objectName + "_HeadA", center + new Vector3(side * 0.42f, 0.0f, 0.38f), new Vector3(0.18f, 0.026f, 0.58f), material, Quaternion.Euler(0.0f, side * -32.0f, 0.0f));
+        CreateBox(objectName + "_HeadB", center + new Vector3(side * 0.42f, 0.0f, 0.38f), new Vector3(0.18f, 0.026f, 0.58f), material, Quaternion.Euler(0.0f, side * 72.0f, 0.0f));
+    }
+
+    private void CreateGameProps(List<Vector3> route, System.Random rng)
+    {
+        for (int i = 1; i < route.Count - 1; i++)
+        {
+            Vector3 point = route[i];
+            Vector3 previous = route[i - 1];
+            Vector3 next = route[i + 1];
+            Vector3 direction = (next - previous).normalized;
+            Vector3 right = new Vector3(direction.z, 0.0f, -direction.x);
+            float side = rng.NextDouble() < 0.5 ? -1.0f : 1.0f;
+
+            Vector3 cratePosition = point + right * side * RandomRange(rng, 1.6f, 3.0f);
+            cratePosition.y = 0.42f;
+            CreateBox($"SupplyCrate_{i:00}", cratePosition, new Vector3(0.75f, 0.75f, 0.75f), palette[7]);
+            CreateBox($"SupplyCrateBand_{i:00}", cratePosition + new Vector3(0.0f, 0.01f, 0.0f), new Vector3(0.82f, 0.08f, 0.82f), palette[4]);
+
+            if (i % 2 == 0)
+            {
+                CreatePickup($"HealthPickup_{i:00}", point - right * side * RandomRange(rng, 1.5f, 2.7f), palette[2]);
+            }
+            else
+            {
+                CreateEnemySilhouette($"EnemySilhouette_{i:00}", point - right * side * RandomRange(rng, 2.0f, 3.4f), palette[5]);
+            }
+        }
+    }
+
+    private void CreatePickup(string objectName, Vector3 position, Material material)
+    {
+        position.y = 0.45f;
+        CreateBox(objectName + "_Vertical", position, new Vector3(0.22f, 0.5f, 0.08f), material);
+        CreateBox(objectName + "_Horizontal", position, new Vector3(0.58f, 0.16f, 0.08f), material);
+        CreateCylinder(objectName + "_Glow", new Vector3(position.x, 0.08f, position.z), new Vector3(0.45f, 0.02f, 0.45f), palette[6]);
+    }
+
+    private void CreateEnemySilhouette(string objectName, Vector3 position, Material material)
+    {
+        position.y = 0.75f;
+        GameObject body = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+        body.name = objectName + "_Body";
+        body.transform.SetParent(generatedRoot.transform, false);
+        body.transform.localPosition = position;
+        body.transform.localScale = new Vector3(0.5f, 0.95f, 0.5f);
+        Renderer bodyRenderer = body.GetComponent<Renderer>();
+        if (bodyRenderer != null)
+        {
+            bodyRenderer.sharedMaterial = material;
+        }
+        CreateBox(objectName + "_Eye", position + new Vector3(0.0f, 0.38f, -0.26f), new Vector3(0.42f, 0.08f, 0.05f), palette[2]);
+    }
+
+    private void CreateLocalLights(List<Vector3> route, System.Random rng)
+    {
+        for (int i = 0; i < route.Count; i += 2)
+        {
+            GameObject lightObject = new GameObject($"LocalLight_{i:00}");
+            lightObject.transform.SetParent(generatedRoot.transform, false);
+            lightObject.transform.localPosition = route[i] + new Vector3(RandomRange(rng, -1.5f, 1.5f), 1.45f, 0.0f);
+            Light light = lightObject.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.range = 7.0f;
+            light.intensity = 1.0f;
+            light.color = i % 4 == 0 ? new Color(0.9f, 0.55f, 0.28f, 1.0f) : new Color(0.45f, 0.7f, 1.0f, 1.0f);
+        }
+    }
+
     private void CreateGrid(float length)
     {
         Material material = CreateMaterial(new Color(0.55f, 0.85f, 1.0f, 0.9f));
@@ -417,10 +597,16 @@ public class UnityDatasetGenerator : MonoBehaviour
 
     private GameObject CreateBox(string objectName, Vector3 position, Vector3 scale, Material material)
     {
+        return CreateBox(objectName, position, scale, material, Quaternion.identity);
+    }
+
+    private GameObject CreateBox(string objectName, Vector3 position, Vector3 scale, Material material, Quaternion rotation)
+    {
         GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
         box.name = objectName;
         box.transform.SetParent(generatedRoot.transform, false);
         box.transform.localPosition = position;
+        box.transform.localRotation = rotation;
         box.transform.localScale = scale;
         Renderer renderer = box.GetComponent<Renderer>();
         if (renderer != null)
@@ -564,6 +750,7 @@ public class UnityDatasetGenerator : MonoBehaviour
         builder.Append("},");
         builder.Append("\"metadata\":{");
         AppendJsonField(builder, "generator", "unity_procedural").Append(",");
+        AppendJsonField(builder, "scene_profile", gameLikeScene ? "game_like_branching_corridor" : "procedural_smoke_test").Append(",");
         AppendJsonField(builder, "seed", episodeSeed);
         builder.Append("}");
         builder.Append("}");
@@ -605,14 +792,15 @@ public class UnityDatasetGenerator : MonoBehaviour
         AppendJsonLine(builder, "run_id", runId, 1, true);
         AppendJsonLine(builder, "source_dataset", "unity_procedural", 1, true);
         AppendJsonLine(builder, "env_name", "unity", 1, true);
-        AppendJsonLine(builder, "scenario", "procedural_visual_navigation", 1, true);
-        AppendJsonLine(builder, "map", "seeded_route_scene", 1, true);
+        AppendJsonLine(builder, "scenario", gameLikeScene ? "game_like_branching_corridor" : "procedural_visual_navigation", 1, true);
+        AppendJsonLine(builder, "map", gameLikeScene ? "procedural_dungeon_branching" : "seeded_route_scene", 1, true);
         AppendJsonLine(builder, "fps", sampleFps, 1, true);
         AppendJsonLine(builder, "frame_skip", frameSkip, 1, true);
         AppendJsonLine(builder, "episode_count", summaries.Count, 1, true);
         AppendJsonLine(builder, "max_steps", framesPerEpisode, 1, true);
         AppendJsonLine(builder, "generation_mode", "unity_procedural_dataset", 1, true);
         AppendJsonLine(builder, "policy", "route_follower", 1, true);
+        AppendJsonLine(builder, "scene_profile", gameLikeScene ? "game_like_branching_corridor" : "procedural_smoke_test", 1, true);
         AppendJsonLine(builder, "seed", seed, 1, true);
         builder.Append("  \"enabled_buffers\":{\"rgb\":true,\"depth\":false,\"labels\":false,\"automap\":false},\n");
         builder.Append("  \"episodes\":[\n");

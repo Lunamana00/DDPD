@@ -6,7 +6,7 @@ using UnityEngine;
 
 public static class DDPDUnityDatasetBatch
 {
-    private const string DefaultRunId = "unity_procedural_001";
+    private const string DefaultRunId = "unity_game_synthetic_001";
     private const int DefaultEpisodes = 4;
     private const int DefaultFramesPerEpisode = 180;
     private const int DefaultCaptureSize = 128;

@@ -46,6 +46,19 @@ client/**/Build/
 client/**/Builds/
 client/**/Logs/
 client/**/UserSettings/
+client/**/MemoryCaptures/
+client/**/Recordings/
+client/**/ExportedObj/
+client/**/.vs/
+client/**/.gradle/
+client/**/*.csproj
+client/**/*.sln
+client/**/*.user
+client/**/*.userprefs
+client/**/*.pidb
+client/**/*.booproj
+client/**/*.svd
+client/**/sysinfo.txt
 
 # Training artifacts that are reproducible and noisy in Git.
 *.pt

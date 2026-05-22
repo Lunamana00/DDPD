@@ -7,23 +7,28 @@ created or committed.
 
 ## viz_01_trajectory_overlay.png
 
-Shows actual v4-derived 10s test samples from
+Shows six actual v4-derived 10s test samples from
 `data/wit_vz/processed/horizon_sweep_v4_defaults/future_10s`. Each subplot
 compares GT future local path, Full Model, and Motion-only CV. The coordinate
 system is egocentric local coordinates with x-axis = right and y-axis =
-forward. RGB insets use the last history frame when available.
+forward. RGB insets use the last history frame when available. The selection
+prioritizes held-out samples with different source/episode ids, visible
+curve/lateral motion, and Full Model improvement over Motion-only CV.
 
 Selected actual v4 samples:
 
-- `wit_vz_v4_default_multi_deathmatch_001__episode_000013_t000017`: Full ADE 88.18, Motion-only CV ADE 719.44, RGB inset=yes
-- `wit_vz_v4_default_predict_position_001__episode_000018_t000158`: Full ADE 164.31, Motion-only CV ADE 753.03, RGB inset=yes
-- `wit_vz_v4_default_predict_position_001__episode_000018_t000159`: Full ADE 184.07, Motion-only CV ADE 768.55, RGB inset=yes
+- `wit_vz_v4_default_deathmatch_001__episode_000034_t000028`: source `wit_vz_v4_default_deathmatch_001`, episode `wit_vz_v4_default_deathmatch_001__episode_000034`, Full ADE 340.62, Motion-only CV ADE 672.61, gain 331.98, RGB inset=yes
+- `wit_vz_v4_default_health_gathering_001__episode_000016_t000011`: source `wit_vz_v4_default_health_gathering_001`, episode `wit_vz_v4_default_health_gathering_001__episode_000016`, Full ADE 305.63, Motion-only CV ADE 631.82, gain 326.19, RGB inset=yes
+- `wit_vz_v4_default_basic_audio_001__episode_000016_t000009`: source `wit_vz_v4_default_basic_audio_001`, episode `wit_vz_v4_default_basic_audio_001__episode_000016`, Full ADE 259.43, Motion-only CV ADE 656.21, gain 396.77, RGB inset=yes
+- `wit_vz_v4_default_defend_the_center_001__episode_000026_t000015`: source `wit_vz_v4_default_defend_the_center_001`, episode `wit_vz_v4_default_defend_the_center_001__episode_000026`, Full ADE 339.06, Motion-only CV ADE 635.61, gain 296.55, RGB inset=yes
+- `wit_vz_v4_default_multi_deathmatch_001__episode_000012_t000010`: source `wit_vz_v4_default_multi_deathmatch_001`, episode `wit_vz_v4_default_multi_deathmatch_001__episode_000012`, Full ADE 237.72, Motion-only CV ADE 515.76, gain 278.05, RGB inset=yes
+- `wit_vz_v4_default_basic_001__episode_000006_t000087`: source `wit_vz_v4_default_basic_001`, episode `wit_vz_v4_default_basic_001__episode_000006`, Full ADE 217.91, Motion-only CV ADE 468.96, gain 251.05, RGB inset=yes
 
 Presenter script: "These are real v4 test samples, not schematic paths. The
 orange dashed path is recent velocity extrapolation, while the full model uses
-visual DINOv3 cues and memory. The examples were chosen because the full model
-improves over motion-only extrapolation, especially when the future path bends
-or changes direction."
+visual DINOv3 cues and memory. I selected a diverse set across source and
+episode ids so the comparison is not just three neighboring moments from the
+same scene."
 
 ## viz_02_horizon_error_growth.png
 

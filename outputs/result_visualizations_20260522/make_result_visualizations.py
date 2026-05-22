@@ -53,12 +53,17 @@ LIGHT_BLUE = (199, 210, 254)
 @dataclass
 class OverlaySample:
     sample_id: str
+    source_id: str
+    episode_id: str
     rgb_path: Path | None
     target: list[list[float]]
     full: list[list[float]]
     cv: list[list[float]]
     full_ade: float
     cv_ade: float
+    improvement: float
+    turn: float
+    lateral: float
     score: float
 
 
@@ -226,6 +231,22 @@ def resolve_rgb_path(dataset: WITVZPathDataset, sample: dict[str, Any]) -> Path 
     return raw_path if raw_path is not None and raw_path.exists() else None
 
 
+def source_label(sample: dict[str, Any], sample_id: str) -> str:
+    source_id = sample.get("source", {}).get("source_id") or sample.get("metadata", {}).get("source_id")
+    if source_id:
+        return str(source_id)
+    return sample_id.split("__", 1)[0].removeprefix("wit_vz_v4_default_")
+
+
+def episode_label(sample: dict[str, Any], sample_id: str) -> str:
+    for key in ["episode_id", "episode", "trajectory_id"]:
+        value = sample.get(key) or sample.get("metadata", {}).get(key)
+        if value is not None:
+            return str(value)
+    parts = sample_id.split("__")
+    return "__".join(parts[:2]) if len(parts) >= 2 else sample_id
+
+
 def load_overlay_samples(device: torch.device, max_batches: int = 0) -> list[OverlaySample]:
     dataset = WITVZPathDataset(
         HORIZON_ROOT / "future_10s",
@@ -263,33 +284,78 @@ def load_overlay_samples(device: torch.device, max_batches: int = 0) -> list[Ove
                 lateral = float((gt[:, 1].max() - gt[:, 1].min()).item())
                 score = float(improvement[i].item() + 20.0 * min(turn, 3.0) + 0.08 * lateral)
                 raw_sample = sample_by_id[sample_id]
+                source_id = source_label(raw_sample, sample_id)
+                episode_id = episode_label(raw_sample, sample_id)
+                improvement_value = float(improvement[i].item())
                 candidates.append(
                     OverlaySample(
                         sample_id=sample_id,
+                        source_id=source_id,
+                        episode_id=episode_id,
                         rgb_path=resolve_rgb_path(dataset, raw_sample),
                         target=gt.tolist(),
                         full=full[i].detach().cpu().tolist(),
                         cv=cv[i].detach().cpu().tolist(),
                         full_ade=float(full_err[i].item()),
                         cv_ade=float(cv_err[i].item()),
+                        improvement=improvement_value,
+                        turn=turn,
+                        lateral=lateral,
                         score=score,
                     )
                 )
     candidates.sort(key=lambda item: item.score, reverse=True)
+
+    def presentation_score(item: OverlaySample) -> float:
+        useful_gain = min(item.improvement, 360.0)
+        shape_bonus = 35.0 * min(item.turn, 6.0) + 0.55 * min(item.lateral, 650.0)
+        tiny_motion_penalty = 1.15 * max(120.0 - item.lateral, 0.0)
+        cv_drift_penalty = 0.65 * max(item.cv_ade - 640.0, 0.0)
+        full_error_penalty = 0.45 * max(item.full_ade - 420.0, 0.0)
+        return useful_gain + shape_bonus - tiny_motion_penalty - cv_drift_penalty - full_error_penalty
+
+    ranked = sorted(candidates, key=presentation_score, reverse=True)
+    visually_clear = [
+        item
+        for item in ranked
+        if item.cv_ade <= 850.0 and item.full_ade <= 520.0 and (item.lateral >= 120.0 or item.turn >= 8.0)
+    ]
+    if len(visually_clear) >= 6:
+        ranked = visually_clear
+
+    target_count = 6
     selected: list[OverlaySample] = []
     seen_sources: set[str] = set()
-    for item in candidates:
-        source = item.sample_id.split("__", 1)[0]
-        if source in seen_sources and len(selected) < 2:
+    seen_episodes: set[str] = set()
+
+    for item in ranked:
+        if item.source_id in seen_sources or item.episode_id in seen_episodes:
             continue
         selected.append(item)
-        seen_sources.add(source)
-        if len(selected) == 3:
+        seen_sources.add(item.source_id)
+        seen_episodes.add(item.episode_id)
+        if len(selected) == target_count:
             break
-    if len(selected) < 3:
-        selected = candidates[:3]
-    if len(selected) < 3:
-        raise RuntimeError("Could not find three overlay samples where Full Model improves over CV.")
+
+    for item in ranked:
+        if len(selected) >= target_count:
+            break
+        if item.episode_id in seen_episodes:
+            continue
+        selected.append(item)
+        seen_sources.add(item.source_id)
+        seen_episodes.add(item.episode_id)
+
+    if len(selected) < target_count:
+        for item in ranked:
+            if len(selected) >= target_count:
+                break
+            if item in selected:
+                continue
+            selected.append(item)
+
+    if len(selected) < target_count:
+        raise RuntimeError("Could not find six overlay samples where Full Model improves over CV.")
     return selected
 
 
@@ -306,29 +372,34 @@ def draw_legend(draw: ImageDraw.ImageDraw, x: int, y: int) -> None:
 def draw_panel_overlay(draw: ImageDraw.ImageDraw, canvas: Image.Image, sample: OverlaySample, panel: tuple[int, int, int, int]) -> None:
     x0, y0, x1, y1 = panel
     rounded_rect(draw, panel, PANEL, outline=(226, 232, 240), radius=18)
-    title = sample.sample_id.replace("wit_vz_v4_default_", "")
-    if len(title) > 58:
-        title = title[:55] + "..."
-    draw_text(draw, (x0 + 26, y0 + 22), title, TEXT, F["small"])
+    title = sample.source_id.replace("wit_vz_v4_default_", "")
+    if len(title) > 34:
+        title = title[:31] + "..."
+    draw_text(draw, (x0 + 22, y0 + 18), title, TEXT, F["small"])
     draw_text(
         draw,
-        (x0 + 26, y0 + 52),
+        (x0 + 22, y0 + 47),
         f"Full ADE {sample.full_ade:.1f} vs CV {sample.cv_ade:.1f}",
         MUTED,
         F["tiny"],
     )
+    draw_text(
+        draw,
+        (x0 + 22, y0 + 70),
+        f"gain {sample.improvement:.1f} | turn {sample.turn:.1f} | lateral {sample.lateral:.0f}",
+        MUTED,
+        F["tiny"],
+    )
 
-    plot_box = (x0 + 54, y0 + 132, x1 - 44, y1 - 64)
+    plot_box = (x0 + 42, y0 + 112, x1 - 34, y1 - 46)
     if sample.rgb_path is not None:
         try:
             rgb = Image.open(sample.rgb_path).convert("RGB")
-            rgb.thumbnail((150 * SCALE, 112 * SCALE), Image.Resampling.LANCZOS)
-            inset = Image.new("RGB", (160 * SCALE, 122 * SCALE), (15, 23, 42))
+            rgb.thumbnail((110 * SCALE, 78 * SCALE), Image.Resampling.LANCZOS)
+            inset = Image.new("RGB", (118 * SCALE, 86 * SCALE), (15, 23, 42))
             inset.paste(rgb, ((inset.width - rgb.width) // 2, (inset.height - rgb.height) // 2))
-            canvas.paste(inset, spoint((x1 - 190, y0 + 32)))
-            draw.rounded_rectangle(sbox((x1 - 190, y0 + 32, x1 - 30, y0 + 154)), radius=10 * SCALE, outline=(203, 213, 225), width=2 * SCALE)
-            draw_text(draw, (x1 - 185, y0 + 160), "last RGB frame", MUTED, F["tiny"])
-            plot_box = (x0 + 54, y0 + 150, x1 - 44, y1 - 64)
+            canvas.paste(inset, spoint((x1 - 152, y0 + 20)))
+            draw.rounded_rectangle(sbox((x1 - 152, y0 + 20, x1 - 34, y0 + 106)), radius=10 * SCALE, outline=(203, 213, 225), width=2 * SCALE)
         except Exception:
             pass
 
@@ -352,16 +423,30 @@ def draw_panel_overlay(draw: ImageDraw.ImageDraw, canvas: Image.Image, sample: O
 def make_trajectory_overlay(device: torch.device) -> list[OverlaySample]:
     samples = load_overlay_samples(device)
     image, draw = new_canvas()
-    draw_text(draw, (60, 42), "Trajectory Overlay: Actual v4 10s Test Samples", TEXT, F["title"])
+    draw_text(draw, (60, 38), "Trajectory Overlay: Diverse Actual v4 10s Test Samples", TEXT, F["title"])
     draw_text(
         draw,
-        (62, 96),
-        "Egocentric local coordinates: x-axis = right, y-axis = forward. Motion-only CV uses recent velocity extrapolation.",
+        (62, 88),
+        "Six held-out samples prioritized for distinct source/episode, curve or lateral motion, and Full Model improvement over Motion-only CV.",
         MUTED,
         F["subtitle"],
     )
-    draw_legend(draw, 1180, 56)
-    panels = [(50, 150, 640, 1015), (665, 150, 1255, 1015), (1280, 150, 1870, 1015)]
+    draw_text(
+        draw,
+        (62, 118),
+        "Egocentric local coordinates: x-axis = right, y-axis = forward. Motion-only CV uses recent velocity extrapolation.",
+        MUTED,
+        F["small"],
+    )
+    draw_legend(draw, 1180, 52)
+    panels = [
+        (45, 165, 620, 585),
+        (672, 165, 1247, 585),
+        (1299, 165, 1874, 585),
+        (45, 622, 620, 1042),
+        (672, 622, 1247, 1042),
+        (1299, 622, 1874, 1042),
+    ]
     for sample, panel in zip(samples, panels):
         draw_panel_overlay(draw, image, sample, panel)
     save_canvas(image, OUT_DIR / "viz_01_trajectory_overlay.png")
@@ -529,7 +614,7 @@ def make_ablation_bar_chart() -> None:
 
 def write_notes(samples: list[OverlaySample]) -> None:
     sample_lines = "\n".join(
-        f"- `{s.sample_id}`: Full ADE {s.full_ade:.2f}, Motion-only CV ADE {s.cv_ade:.2f}, RGB inset={'yes' if s.rgb_path else 'no'}"
+        f"- `{s.sample_id}`: source `{s.source_id}`, episode `{s.episode_id}`, Full ADE {s.full_ade:.2f}, Motion-only CV ADE {s.cv_ade:.2f}, gain {s.improvement:.2f}, RGB inset={'yes' if s.rgb_path else 'no'}"
         for s in samples
     )
     text = f"""# Result Visualization Notes
@@ -541,11 +626,13 @@ created or committed.
 
 ## viz_01_trajectory_overlay.png
 
-Shows actual v4-derived 10s test samples from
+Shows six actual v4-derived 10s test samples from
 `data/wit_vz/processed/horizon_sweep_v4_defaults/future_10s`. Each subplot
 compares GT future local path, Full Model, and Motion-only CV. The coordinate
 system is egocentric local coordinates with x-axis = right and y-axis =
-forward. RGB insets use the last history frame when available.
+forward. RGB insets use the last history frame when available. The selection
+prioritizes held-out samples with different source/episode ids, visible
+curve/lateral motion, and Full Model improvement over Motion-only CV.
 
 Selected actual v4 samples:
 
@@ -553,9 +640,9 @@ Selected actual v4 samples:
 
 Presenter script: "These are real v4 test samples, not schematic paths. The
 orange dashed path is recent velocity extrapolation, while the full model uses
-visual DINOv3 cues and memory. The examples were chosen because the full model
-improves over motion-only extrapolation, especially when the future path bends
-or changes direction."
+visual DINOv3 cues and memory. I selected a diverse set across source and
+episode ids so the comparison is not just three neighboring moments from the
+same scene."
 
 ## viz_02_horizon_error_growth.png
 

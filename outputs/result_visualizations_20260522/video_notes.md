@@ -17,11 +17,19 @@ Date: 2026-05-22
 - DINOv3 cache: `data/wit_vz/feature_cache/wit_vz_v4_defaults_001_dinov3_convnext_tiny`
 - Horizon: 3 seconds, 15 future waypoints at 5 FPS
 - Input history: 1 second of visual and ego-motion history
-- Video: 225 frames at 10 FPS, 22.5s
+- Video: 250 frames at 10 FPS, 25.0s
 
 This is an offline prediction replay, not closed-loop control. The model is not
 driving the agent in the video; each frame shows a held-out logged ViZDoom state
 and compares future-path predictions against the logged future trajectory.
+
+The large right panel is the main comparison view. The bright green moving dot
+walks along the GT future path from t+0.2s to t+3.0s while the full model and
+Motion-only CV predictions remain overlaid for that logged state. This makes
+the GT future motion explicit instead of showing it only as a static line. Each
+frame uses an adaptive zoom around the current GT and Full Model paths for
+readability; if Motion-only CV drifts far away, its dashed line can run to the
+plot edge.
 
 ## Colors
 
@@ -40,10 +48,10 @@ Selected from held-out v4 test samples where RGB, GT future path, Motion-only CV
 prediction, and Full Model prediction are all available, and where the Full
 Model improves over Motion-only CV on average over the replay segment.
 
-Selected episode: `wit_vz_v4_default_deathmatch_001__episode_000026`
-Selected sample range: `wit_vz_v4_default_deathmatch_001__episode_000026_t000008` to `wit_vz_v4_default_deathmatch_001__episode_000026_t000082`
-Mean Full Model ADE: 163.48
-Mean Motion-only CV ADE: 218.73
+Selected episode: `wit_vz_v4_default_health_gathering_001__episode_000020`
+Selected sample range: `wit_vz_v4_default_health_gathering_001__episode_000020_t000008` to `wit_vz_v4_default_health_gathering_001__episode_000020_t000057`
+Mean Full Model ADE: 60.30
+Mean Motion-only CV ADE: 138.99
 
 ## Presenter Script
 

@@ -60,8 +60,8 @@ FRAME_MID = OUT_DIR / "viz_04_frame_mid.png"
 NOTES_PATH = OUT_DIR / "video_notes.md"
 
 VIDEO_FPS = 10
-REPEAT_PER_SAMPLE = 3
-UNIQUE_SAMPLES = 75
+REPEAT_PER_SAMPLE = 5
+UNIQUE_SAMPLES = 50
 FRAME_SKIP = 4
 DOOM_FPS = 35.0
 
@@ -168,7 +168,10 @@ def compute_plot_bounds(segment: list[ReplayRecord]) -> tuple[float, float, floa
     rights = [0.0]
     forwards = [0.0]
     for record in segment:
-        for path in (record.target, record.full, record.cv):
+        # Frame the plot around GT and the full model so the comparison remains
+        # readable. Motion-only CV can drift far away; it is clipped to the
+        # panel edge when necessary.
+        for path in (record.target, record.full):
             for forward, right in path:
                 rights.append(float(right))
                 forwards.append(float(forward))
@@ -207,6 +210,8 @@ def project_path(path: list[list[float]], plot: tuple[int, int, int, int], bound
     for forward, right in path:
         x = cx + (float(right) - center_r) * scale
         y = cy - (float(forward) - center_f) * scale
+        x = max(x0, min(x1, x))
+        y = max(y0, min(y1, y))
         points.append((x, y))
     return points
 
@@ -238,23 +243,54 @@ def draw_legend(draw: ImageDraw.ImageDraw, x: int, y: int) -> None:
 def draw_rgb_panel(canvas: Image.Image, draw: ImageDraw.ImageDraw, record: ReplayRecord, box: tuple[int, int, int, int]) -> None:
     rounded_rect(draw, box, PANEL, outline=(226, 232, 240), radius=18)
     x0, y0, x1, y1 = box
-    draw_text(draw, (x0 + 28, y0 + 26), "ViZDoom RGB history frame", TEXT, F["section"])
-    frame_box = (x0 + 44, y0 + 82, x1 - 44, y1 - 42)
+    draw_text(draw, (x0 + 22, y0 + 22), "Current RGB", TEXT, F["section"])
+    frame_box = (x0 + 24, y0 + 72, x1 - 24, y1 - 30)
     if record.rgb_path is not None:
         rgb = Image.open(record.rgb_path).convert("RGB")
-        rgb.thumbnail(((frame_box[2] - frame_box[0]) * SCALE, (frame_box[3] - frame_box[1]) * SCALE), Image.Resampling.LANCZOS)
-        bg = Image.new("RGB", ((frame_box[2] - frame_box[0]) * SCALE, (frame_box[3] - frame_box[1]) * SCALE), (16, 24, 39))
+        max_w = (frame_box[2] - frame_box[0]) * SCALE
+        max_h = (frame_box[3] - frame_box[1]) * SCALE
+        scale = min(max_w / rgb.width, max_h / rgb.height)
+        rgb = rgb.resize((max(1, int(rgb.width * scale)), max(1, int(rgb.height * scale))), Image.Resampling.NEAREST)
+        bg = Image.new(
+            "RGB",
+            (max_w, max_h),
+            (16, 24, 39),
+        )
         bg.paste(rgb, ((bg.width - rgb.width) // 2, (bg.height - rgb.height) // 2))
         canvas.paste(bg, spoint((frame_box[0], frame_box[1])))
     draw.rounded_rectangle(sbox(frame_box), radius=14 * SCALE, outline=(203, 213, 225), width=2 * SCALE)
 
 
-def draw_path_panel(draw: ImageDraw.ImageDraw, record: ReplayRecord, box: tuple[int, int, int, int], bounds: tuple[float, float, float, float]) -> None:
+def draw_gt_motion_marker(
+    draw: ImageDraw.ImageDraw,
+    gt_points: list[tuple[float, float]],
+    progress_index: int,
+) -> None:
+    if not gt_points:
+        return
+    progress_index = max(0, min(progress_index, len(gt_points) - 1))
+    trail = gt_points[: progress_index + 1]
+    if len(trail) >= 2:
+        draw_line(draw, trail, (21, 128, 61), width=12)
+    active = gt_points[progress_index]
+    ellipse_center(draw, active, 16, GREEN, outline=(255, 255, 255))
+    ellipse_center(draw, active, 7, (255, 255, 255), outline=GREEN)
+
+
+def draw_path_panel(
+    draw: ImageDraw.ImageDraw,
+    record: ReplayRecord,
+    box: tuple[int, int, int, int],
+    bounds: tuple[float, float, float, float],
+    progress_index: int,
+) -> None:
     rounded_rect(draw, box, PANEL, outline=(226, 232, 240), radius=18)
     x0, y0, x1, y1 = box
-    draw_text(draw, (x0 + 28, y0 + 26), "Future local path prediction", TEXT, F["section"])
-    draw_text(draw, (x0 + 28, y0 + 58), "x = right, y = forward, origin = current pose", MUTED, F["small"])
-    plot = (x0 + 72, y0 + 120, x1 - 70, y1 - 72)
+    draw_text(draw, (x0 + 34, y0 + 24), "Future local path prediction", TEXT, F["section"])
+    draw_text(draw, (x0 + 34, y0 + 58), "x = right, y = forward, origin = current pose", MUTED, F["small"])
+    t_future = (progress_index + 1) / 5.0
+    draw_text(draw, (x1 - 410, y0 + 52), f"GT motion marker: t+{t_future:.1f}s", GREEN, F["label"])
+    plot = (x0 + 78, y0 + 122, x1 - 72, y1 - 86)
     px0, py0, px1, py1 = plot
     for frac in [0.25, 0.5, 0.75]:
         gx = px0 + (px1 - px0) * frac
@@ -268,35 +304,50 @@ def draw_path_panel(draw: ImageDraw.ImageDraw, record: ReplayRecord, box: tuple[
     cv = project_path(record.cv, plot, bounds)
     origin = project_path([[0.0, 0.0]], plot, bounds)[0]
     draw_line(draw, cv, ORANGE, width=6, dashed=True)
-    draw_line(draw, gt, GREEN, width=7)
-    draw_line(draw, full, BLUE, width=7)
+    draw_line(draw, full, BLUE, width=8)
+    draw_line(draw, gt, (74, 222, 128), width=7)
+    draw_gt_motion_marker(draw, gt, progress_index)
     draw_dots(draw, cv, ORANGE, radius=5)
-    draw_dots(draw, gt, GREEN, radius=6)
     draw_dots(draw, full, BLUE, radius=6)
+    draw_dots(draw, gt, GREEN, radius=5)
     draw_triangle(draw, origin)
     draw_text(draw, (px0, py1 + 22), "right", AXIS, F["axis"])
     draw_text(draw, (px0 - 12, py0 - 34), "forward", AXIS, F["axis"])
 
 
 def draw_metrics(draw: ImageDraw.ImageDraw, record: ReplayRecord, frame_index: int, total_frames: int) -> None:
-    rounded_rect(draw, (70, 892, 1850, 1018), (248, 250, 252), outline=(226, 232, 240), radius=16)
+    rounded_rect(draw, (70, 675, 490, 955), (248, 250, 252), outline=(226, 232, 240), radius=16)
     timestamp = record.center_step * FRAME_SKIP / DOOM_FPS
-    draw_text(draw, (100, 914), f"sample: {record.sample_id}", TEXT, F["small"])
-    draw_text(draw, (100, 948), f"time {timestamp:.2f}s | frame {frame_index + 1}/{total_frames}", MUTED, F["small"])
-    draw_text(draw, (850, 918), f"Full Model ADE/FDE: {record.full_ade:.2f} / {record.full_fde:.2f}", BLUE, F["label"])
-    draw_text(draw, (850, 956), f"Motion-only CV ADE/FDE: {record.cv_ade:.2f} / {record.cv_fde:.2f}", ORANGE, F["label"])
+    sample_tail = record.sample_id.split("__", 1)[-1]
+    if len(sample_tail) > 33:
+        sample_tail = sample_tail[:30] + "..."
+    draw_text(draw, (96, 700), "Offline replay state", TEXT, F["section"])
+    draw_text(draw, (96, 740), f"sample: {sample_tail}", TEXT, F["small"])
+    draw_text(draw, (96, 774), f"time {timestamp:.2f}s", MUTED, F["small"])
+    draw_text(draw, (96, 808), f"frame {frame_index + 1}/{total_frames}", MUTED, F["small"])
+    draw_text(draw, (96, 858), "Full ADE/FDE", BLUE, F["small"])
+    draw_text(draw, (275, 858), f"{record.full_ade:.2f} / {record.full_fde:.2f}", BLUE, F["small"])
+    draw_text(draw, (96, 895), "CV ADE/FDE", ORANGE, F["small"])
+    draw_text(draw, (275, 895), f"{record.cv_ade:.2f} / {record.cv_fde:.2f}", ORANGE, F["small"])
     improvement = record.cv_ade - record.full_ade
     fill = GREEN if improvement > 0 else RED
-    draw_text(draw, (1450, 938), f"Full better by {improvement:.2f} ADE", fill, F["label"])
+    draw_text(draw, (96, 934), f"Full better by {improvement:.2f} ADE", fill, F["small"])
 
 
-def render_frame(record: ReplayRecord, bounds: tuple[float, float, float, float], frame_index: int, total_frames: int) -> Image.Image:
+def render_frame(
+    record: ReplayRecord,
+    bounds: tuple[float, float, float, float],
+    progress_index: int,
+    frame_index: int,
+    total_frames: int,
+) -> Image.Image:
     canvas, draw = new_canvas()
     draw_text(draw, (60, 34), "GT vs Prediction on Held-out ViZDoom Replay", TEXT, F["title"])
     draw_text(draw, (62, 88), "Future local path prediction from 1-second visual and ego-motion history", MUTED, F["subtitle"])
-    draw_legend(draw, 975, 50)
-    draw_rgb_panel(canvas, draw, record, (70, 150, 890, 850))
-    draw_path_panel(draw, record, (930, 150, 1850, 850), bounds)
+    draw_legend(draw, 760, 50)
+    draw_rgb_panel(canvas, draw, record, (70, 150, 490, 640))
+    local_bounds = compute_plot_bounds([record])
+    draw_path_panel(draw, record, (525, 150, 1850, 955), local_bounds, progress_index)
     draw_metrics(draw, record, frame_index, total_frames)
     return canvas.resize((W, H), Image.Resampling.LANCZOS)
 
@@ -328,6 +379,14 @@ Date: 2026-05-22
 This is an offline prediction replay, not closed-loop control. The model is not
 driving the agent in the video; each frame shows a held-out logged ViZDoom state
 and compares future-path predictions against the logged future trajectory.
+
+The large right panel is the main comparison view. The bright green moving dot
+walks along the GT future path from t+0.2s to t+3.0s while the full model and
+Motion-only CV predictions remain overlaid for that logged state. This makes
+the GT future motion explicit instead of showing it only as a static line. Each
+frame uses an adaptive zoom around the current GT and Full Model paths for
+readability; if Motion-only CV drifts far away, its dashed line can run to the
+plot edge.
 
 ## Colors
 
@@ -445,12 +504,20 @@ def main() -> None:
     records = collect_predictions(device)
     segment = select_segment(records)
     bounds = compute_plot_bounds(segment)
-    expanded = [record for record in segment for _ in range(REPEAT_PER_SAMPLE)]
+    expanded = [
+        (record, phase)
+        for record in segment
+        for phase in range(REPEAT_PER_SAMPLE)
+    ]
     total_frames = len(expanded)
     with tempfile.TemporaryDirectory(prefix="ddpd_gt_replay_") as tmp:
         frame_dir = Path(tmp)
-        for index, record in enumerate(expanded):
-            frame = render_frame(record, bounds, index, total_frames)
+        for index, (record, phase) in enumerate(expanded):
+            if len(record.target) <= 1:
+                progress_index = 0
+            else:
+                progress_index = int(round(phase * (len(record.target) - 1) / max(REPEAT_PER_SAMPLE - 1, 1)))
+            frame = render_frame(record, bounds, progress_index, index, total_frames)
             frame_path = frame_dir / f"frame_{index:04d}.png"
             frame.save(frame_path, "PNG")
             if index == 0:

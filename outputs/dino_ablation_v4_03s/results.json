@@ -1,0 +1,232 @@
+{
+  "variants": [
+    {
+      "variant": "constant_velocity",
+      "description": "Motion-only constant velocity baseline; no visual branch training.",
+      "run_dir": "runs/dino_ablation_v4_03s/constant_velocity",
+      "available": true,
+      "model": "constant_velocity",
+      "backbone": "small_cnn",
+      "epochs_completed": 0,
+      "best_epoch": null,
+      "best_val_ADE": 70.53717532368661,
+      "best_val_FDE": 122.51521617557312,
+      "train_ADE_at_best": null,
+      "val_train_ADE_gap_at_best": null,
+      "test_ADE": 75.72009869257396,
+      "test_FDE": 131.69042494705494,
+      "test_per_horizon_error": [
+        13.897482872009277,
+        25.390533447265625,
+        35.26652526855469,
+        44.19832229614258,
+        52.60490036010742,
+        60.84093475341797,
+        68.894775390625,
+        76.79691314697266,
+        84.69353485107422,
+        92.6404800415039,
+        100.53099060058594,
+        108.30091094970703,
+        116.09706115722656,
+        123.95765686035156,
+        131.6904296875
+      ],
+      "test_prefix_metrics": {
+        "1s": {
+          "ADE": 34.271552848815915,
+          "FDE": 52.60490036010742
+        },
+        "2s": {
+          "ADE": 55.52244024276733,
+          "FDE": 92.6404800415039
+        },
+        "3s": {
+          "ADE": 75.72009677886963,
+          "FDE": 131.6904296875
+        }
+      },
+      "avg_epoch_seconds": null,
+      "peak_cuda_memory_mb": null
+    },
+    {
+      "variant": "zero_visual",
+      "description": "Cue-memory model with zero image-content tokens plus the same positional scaffold.",
+      "run_dir": "runs/dino_ablation_v4_03s/zero_visual",
+      "available": true,
+      "model": "cue_memory_path_predictor",
+      "backbone": "zero_tokens",
+      "epochs_completed": 21,
+      "best_epoch": 7,
+      "best_val_ADE": 66.24655531419259,
+      "best_val_FDE": 113.00940674122515,
+      "train_ADE_at_best": 69.5083653110371,
+      "val_train_ADE_gap_at_best": -3.261809996844505,
+      "test_ADE": 70.23191797031132,
+      "test_FDE": 119.10715703665709,
+      "test_per_horizon_error": [
+        14.249582290649414,
+        23.743207931518555,
+        33.048458099365234,
+        41.60995101928711,
+        49.72721862792969,
+        57.467140197753906,
+        64.82743835449219,
+        72.02503204345703,
+        79.20085144042969,
+        86.21276092529297,
+        93.05825805664062,
+        99.84696960449219,
+        106.40677642822266,
+        112.94791412353516,
+        119.10716247558594
+      ],
+      "test_prefix_metrics": {
+        "1s": {
+          "ADE": 32.47568359375,
+          "FDE": 49.72721862792969
+        },
+        "2s": {
+          "ADE": 52.21116409301758,
+          "FDE": 86.21276092529297
+        },
+        "3s": {
+          "ADE": 70.23191477457682,
+          "FDE": 119.10716247558594
+        }
+      },
+      "avg_epoch_seconds": 25.913563786251913,
+      "peak_cuda_memory_mb": 3632.27978515625
+    },
+    {
+      "variant": "small_cnn",
+      "description": "Cue-memory model with a trainable small CNN visual encoder from RGB.",
+      "run_dir": "runs/dino_ablation_v4_03s/small_cnn",
+      "available": true,
+      "model": "cue_memory_path_predictor",
+      "backbone": "small_cnn",
+      "epochs_completed": 34,
+      "best_epoch": 20,
+      "best_val_ADE": 59.806950352357255,
+      "best_val_FDE": 101.70740717760214,
+      "train_ADE_at_best": 48.89308074493803,
+      "val_train_ADE_gap_at_best": 10.913869607419223,
+      "test_ADE": 65.21357410935511,
+      "test_FDE": 108.74503699283093,
+      "test_per_horizon_error": [
+        13.394340515136719,
+        23.37082862854004,
+        32.159095764160156,
+        40.07941436767578,
+        47.49506759643555,
+        54.42770767211914,
+        60.934776306152344,
+        67.21651458740234,
+        73.37026977539062,
+        79.41061401367188,
+        85.5138168334961,
+        91.49608612060547,
+        97.37916564941406,
+        103.21080780029297,
+        108.74503326416016
+      ],
+      "test_prefix_metrics": {
+        "1s": {
+          "ADE": 31.29974937438965,
+          "FDE": 47.49506759643555
+        },
+        "2s": {
+          "ADE": 49.185862922668456,
+          "FDE": 79.41061401367188
+        },
+        "3s": {
+          "ADE": 65.21356925964355,
+          "FDE": 108.74503326416016
+        }
+      },
+      "avg_epoch_seconds": 59.04016186609207,
+      "peak_cuda_memory_mb": 4413.56298828125
+    },
+    {
+      "variant": "cached_dinov3",
+      "description": "Cue-memory model with frozen cached DINOv3 ConvNeXt-Tiny dense visual tokens.",
+      "run_dir": "runs/dino_ablation_v4_03s/cached_dinov3",
+      "available": true,
+      "model": "cue_memory_path_predictor",
+      "backbone": "cached_dinov3_convnext_tiny",
+      "epochs_completed": 17,
+      "best_epoch": 3,
+      "best_val_ADE": 57.814947857483105,
+      "best_val_FDE": 97.00717232701825,
+      "train_ADE_at_best": 60.19264871051188,
+      "val_train_ADE_gap_at_best": -2.3777008530287773,
+      "test_ADE": 61.85060622948101,
+      "test_FDE": 103.54201329609073,
+      "test_per_horizon_error": [
+        18.5884952545166,
+        24.137258529663086,
+        31.165721893310547,
+        38.063140869140625,
+        44.40011215209961,
+        50.425689697265625,
+        56.34344482421875,
+        62.346885681152344,
+        68.39506530761719,
+        74.3255844116211,
+        80.26154327392578,
+        86.09651947021484,
+        91.91535186767578,
+        97.75222778320312,
+        103.54200744628906
+      ],
+      "test_prefix_metrics": {
+        "1s": {
+          "ADE": 31.270945739746093,
+          "FDE": 44.40011215209961
+        },
+        "2s": {
+          "ADE": 46.819139862060545,
+          "FDE": 74.3255844116211
+        },
+        "3s": {
+          "ADE": 61.85060323079427,
+          "FDE": 103.54200744628906
+        }
+      },
+      "avg_epoch_seconds": 54.74187285540735,
+      "peak_cuda_memory_mb": 4433.421875
+    }
+  ],
+  "comparisons": {
+    "cached_dinov3_vs_constant_velocity": {
+      "test_ADE_gain_percent": 18.316791317723357,
+      "test_FDE_gain_percent": 21.374683590155506,
+      "1s_ADE_gain_percent": 8.75538707658382,
+      "1s_FDE_gain_percent": 15.597003609629223,
+      "2s_ADE_gain_percent": 15.675284340263717,
+      "2s_FDE_gain_percent": 19.769862614785183,
+      "3s_ADE_gain_percent": 18.31679321353663,
+      "3s_FDE_gain_percent": 21.374690862507506
+    },
+    "cached_dinov3_vs_zero_visual": {
+      "test_ADE_gain_percent": 11.933764566095551,
+      "test_FDE_gain_percent": 13.068185093004903,
+      "1s_ADE_gain_percent": 3.709661262483044,
+      "1s_FDE_gain_percent": 10.712657218350973,
+      "2s_ADE_gain_percent": 10.327339611411068,
+      "2s_FDE_gain_percent": 13.788186790552526,
+      "3s_ADE_gain_percent": 11.933764828545579,
+      "3s_FDE_gain_percent": 13.068193974050345
+    },
+    "cached_dinov3_vs_small_cnn": {
+      "test_ADE_gain_percent": 5.156852581388682,
+      "test_FDE_gain_percent": 4.784607960621889,
+      "1s_ADE_gain_percent": 0.09202512869679325,
+      "1s_FDE_gain_percent": 6.516372332878229,
+      "2s_ADE_gain_percent": 4.811795341130731,
+      "2s_FDE_gain_percent": 6.403463397443709,
+      "3s_ADE_gain_percent": 5.156850126481882,
+      "3s_FDE_gain_percent": 4.784610075231721
+    }
+  }
+}

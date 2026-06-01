@@ -1,0 +1,11 @@
+dataset: data/wit_vz/processed/horizon_sweep_v4_defaults/future_03s
+model: constant_velocity
+backbone: small_cnn
+epochs: 1
+batch_size: 512
+hidden_dim: 128
+freeze_backbone: true
+loss: huber
+trajectory_scale: auto
+seed: 7
+output_dir: runs/dino_ablation_v4_03s/constant_velocity

@@ -47,6 +47,8 @@ def main() -> None:
         backbone_name=str(checkpoint.get("backbone", "small_cnn")),
         hidden_dim=int(checkpoint.get("hidden_dim", 128)),
         freeze_backbone=bool(checkpoint.get("freeze_backbone", True)),
+        num_motivation_tokens=int(checkpoint.get("num_motivation_tokens", 4)),
+        num_heads=int(checkpoint.get("num_heads", 4)),
         num_cue_tokens=int(checkpoint.get("num_cue_tokens", 8)),
         num_modes=int(checkpoint.get("num_modes", 1)),
         temporal_type=str(checkpoint.get("temporal_type", "transformer")),

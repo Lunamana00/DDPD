@@ -95,6 +95,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr-scheduler-factor", type=float, default=default("lr_scheduler_factor", 0.5))
     parser.add_argument("--min-lr", type=float, default=default("min_lr", 1e-6))
     parser.add_argument("--hidden-dim", type=int, default=default("hidden_dim", 128))
+    parser.add_argument("--num-motivation-tokens", type=int, default=default("num_motivation_tokens", 4))
+    parser.add_argument("--num-heads", type=int, default=default("num_heads", 4))
     parser.add_argument("--image-size", type=int, default=default("image_size", 64))
     parser.add_argument("--loss", choices=["huber", "mse", "l2"], default=default("loss", "huber"))
     parser.add_argument(
@@ -443,6 +445,8 @@ def save_checkpoint(
                 args.visual_feature_cache.as_posix() if args.visual_feature_cache is not None else None
             ),
             "hidden_dim": args.hidden_dim,
+            "num_motivation_tokens": args.num_motivation_tokens,
+            "num_heads": args.num_heads,
             "image_size": args.image_size,
             "future_steps": dataset_manifest["future_steps"],
             "history_frames": dataset_manifest["history_frames"],
@@ -535,6 +539,8 @@ def main() -> None:
         dropout=args.dropout,
         use_constant_velocity_residual=args.use_constant_velocity_residual,
         residual_scale=residual_scale,
+        num_motivation_tokens=args.num_motivation_tokens,
+        num_heads=args.num_heads,
     ).to(device)
     if args.data_parallel and device.type == "cuda" and torch.cuda.device_count() > 1:
         model = torch.nn.DataParallel(model)

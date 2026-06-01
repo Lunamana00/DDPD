@@ -132,6 +132,8 @@ def load_checkpoint_model(checkpoint_path: Path, device: torch.device) -> tuple[
         backbone_name=str(checkpoint.get("backbone", "small_cnn")),
         hidden_dim=int(checkpoint.get("hidden_dim", 128)),
         freeze_backbone=bool(checkpoint.get("freeze_backbone", True)),
+        num_motivation_tokens=int(checkpoint.get("num_motivation_tokens", 4)),
+        num_heads=int(checkpoint.get("num_heads", 4)),
         use_bottleneck_adapters=bool(checkpoint.get("use_bottleneck_adapters", True)),
         adapter_bottleneck_dim=int(checkpoint.get("adapter_bottleneck_dim", 64)),
         num_cue_tokens=int(checkpoint.get("num_cue_tokens", 8)),

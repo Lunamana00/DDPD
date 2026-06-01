@@ -231,6 +231,16 @@ def move_batch(batch: dict[str, Any], device: torch.device) -> dict[str, Any]:
     return moved
 
 
+def make_grad_scaler(device: torch.device, enabled: bool) -> torch.cuda.amp.GradScaler | torch.amp.GradScaler:
+    if hasattr(torch.amp, "GradScaler"):
+        return torch.amp.GradScaler("cuda", enabled=enabled and device.type == "cuda")
+    return torch.cuda.amp.GradScaler(enabled=enabled and device.type == "cuda")
+
+
+def autocast_kwargs(device: torch.device, enabled: bool) -> dict[str, Any]:
+    return {"enabled": enabled and device.type == "cuda"}
+
+
 def estimate_trajectory_scale(dataset: WITVZPathDataset) -> float:
     values = []
     for sample in dataset.samples:
@@ -582,7 +592,7 @@ def main() -> None:
             patience=args.lr_scheduler_patience,
             min_lr=args.min_lr,
         )
-    scaler = torch.amp.GradScaler("cuda", enabled=args.mixed_precision and device.type == "cuda")
+    scaler = make_grad_scaler(device, args.mixed_precision)
     best_val = float("inf")
     best_epoch = 0
     epochs_without_improvement = 0
@@ -607,7 +617,7 @@ def main() -> None:
                     balance_loss_weights,
                     device,
                 )
-            with torch.amp.autocast("cuda", enabled=args.mixed_precision and device.type == "cuda"):
+            with torch.cuda.amp.autocast(**autocast_kwargs(device, args.mixed_precision)):
                 pred = model(batch)
                 loss = trajectory_loss(
                     pred,

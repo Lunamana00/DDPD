@@ -61,6 +61,7 @@ def create_model(
             memory_type=str(kwargs.get("memory_type", "gru_cell")),
             use_spatial_graph=bool(kwargs.get("use_spatial_graph", False)),
             spatial_graph_neighbors=int(kwargs.get("spatial_graph_neighbors", 8)),
+            spatial_relation_type=kwargs.get("spatial_relation_type"),
             use_temporal_difference_conv=bool(kwargs.get("use_temporal_difference_conv", False)),
             use_temporal_shift=bool(kwargs.get("use_temporal_shift", False)),
             decoder_layers=int(kwargs.get("decoder_layers", 1)),

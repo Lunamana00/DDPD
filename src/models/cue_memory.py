@@ -133,6 +133,102 @@ class DynamicSpatialGraphAggregator(nn.Module):
         return aggregated.reshape(batch, time, num_tokens, dim)
 
 
+class FullSpatialAttentionAggregator(nn.Module):
+    """Dense frame-local attention over all visual tokens except self."""
+
+    def __init__(self, dim: int, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.q = nn.Linear(dim, dim)
+        self.k = nn.Linear(dim, dim)
+        self.v = nn.Linear(dim, dim)
+        self.out = nn.Sequential(nn.Linear(dim, dim), nn.Dropout(dropout))
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        # tokens: [B, T, N, D]
+        batch, time, num_tokens, dim = tokens.shape
+        if num_tokens <= 1:
+            return tokens
+        flat = tokens.reshape(batch * time, num_tokens, dim)
+        normalized = self.norm(flat)
+        query = self.q(normalized)
+        key = self.k(normalized)
+        value = self.v(normalized)
+        scores = torch.matmul(query, key.transpose(1, 2)) / math.sqrt(dim)
+        eye = torch.eye(num_tokens, device=tokens.device, dtype=torch.bool)[None, :, :]
+        scores = scores.masked_fill(eye, torch.finfo(scores.dtype).min)
+        weights = torch.softmax(scores, dim=-1)
+        context = torch.matmul(weights, value)
+        aggregated = flat + self.out(context)
+        return aggregated.reshape(batch, time, num_tokens, dim)
+
+
+class LocalGridSpatialAggregator(nn.Module):
+    """Frame-local attention restricted to fixed 8-neighborhood grid edges."""
+
+    def __init__(self, dim: int, dropout: float = 0.1) -> None:
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.q = nn.Linear(dim, dim)
+        self.k = nn.Linear(dim, dim)
+        self.v = nn.Linear(dim, dim)
+        self.out = nn.Sequential(nn.Linear(dim, dim), nn.Dropout(dropout))
+
+    @staticmethod
+    def _local_neighbor_mask(num_tokens: int, device: torch.device) -> torch.Tensor:
+        height, width = SpatialPositionalEncoding._grid_size(num_tokens)
+        mask = torch.zeros((num_tokens, num_tokens), device=device, dtype=torch.bool)
+        for index in range(num_tokens):
+            row, col = divmod(index, width)
+            for row_offset in (-1, 0, 1):
+                for col_offset in (-1, 0, 1):
+                    if row_offset == 0 and col_offset == 0:
+                        continue
+                    neighbor_row = row + row_offset
+                    neighbor_col = col + col_offset
+                    if 0 <= neighbor_row < height and 0 <= neighbor_col < width:
+                        neighbor_index = neighbor_row * width + neighbor_col
+                        if neighbor_index < num_tokens:
+                            mask[index, neighbor_index] = True
+        return mask
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        # tokens: [B, T, N, D]
+        batch, time, num_tokens, dim = tokens.shape
+        if num_tokens <= 1:
+            return tokens
+        flat = tokens.reshape(batch * time, num_tokens, dim)
+        normalized = self.norm(flat)
+        query = self.q(normalized)
+        key = self.k(normalized)
+        value = self.v(normalized)
+        scores = torch.matmul(query, key.transpose(1, 2)) / math.sqrt(dim)
+        local_mask = self._local_neighbor_mask(num_tokens, tokens.device)[None, :, :]
+        scores = scores.masked_fill(~local_mask, torch.finfo(scores.dtype).min)
+        weights = torch.softmax(scores, dim=-1)
+        context = torch.matmul(weights, value)
+        aggregated = flat + self.out(context)
+        return aggregated.reshape(batch, time, num_tokens, dim)
+
+
+def build_spatial_relation_module(
+    relation_type: str,
+    dim: int,
+    neighbors: int = 8,
+    dropout: float = 0.1,
+) -> nn.Module:
+    normalized = relation_type.lower()
+    if normalized == "none":
+        return nn.Identity()
+    if normalized == "topk_graph":
+        return DynamicSpatialGraphAggregator(dim, neighbors, dropout=dropout)
+    if normalized == "full_attention":
+        return FullSpatialAttentionAggregator(dim, dropout=dropout)
+    if normalized == "local_grid":
+        return LocalGridSpatialAggregator(dim, dropout=dropout)
+    raise ValueError(f"Unknown spatial_relation_type: {relation_type}")
+
+
 class EdgeMessageDynamicSpatialGraphAggregator(nn.Module):
     """Dynamic graph aggregation with STRNet-style edge messages."""
 
@@ -802,6 +898,7 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
         memory_type: str = "gru_cell",
         use_spatial_graph: bool = False,
         spatial_graph_neighbors: int = 8,
+        spatial_relation_type: str | None = None,
         use_temporal_difference_conv: bool = False,
         use_temporal_shift: bool = False,
         decoder_layers: int = 1,
@@ -825,9 +922,17 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             else nn.Identity()
         )
         strnet_temporal = temporal_type.lower() == "strnet"
+        if spatial_relation_type is None:
+            spatial_relation_type = "topk_graph" if use_spatial_graph else "none"
+        self.spatial_relation_type = spatial_relation_type
         self.spatial_graph = (
-            DynamicSpatialGraphAggregator(hidden_dim, spatial_graph_neighbors, dropout=dropout)
-            if use_spatial_graph and not strnet_temporal
+            build_spatial_relation_module(
+                spatial_relation_type,
+                hidden_dim,
+                spatial_graph_neighbors,
+                dropout=dropout,
+            )
+            if not strnet_temporal
             else nn.Identity()
         )
         self.temporal = TemporalAdapter(

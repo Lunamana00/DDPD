@@ -130,6 +130,7 @@ def load_model(checkpoint_path: Path, device: torch.device) -> tuple[torch.nn.Mo
         memory_type=str(checkpoint.get("memory_type", "gru_cell")),
         use_spatial_graph=bool(checkpoint.get("use_spatial_graph", False)),
         spatial_graph_neighbors=int(checkpoint.get("spatial_graph_neighbors", 8)),
+        spatial_relation_type=checkpoint.get("spatial_relation_type"),
         use_temporal_difference_conv=bool(checkpoint.get("use_temporal_difference_conv", False)),
         use_temporal_shift=bool(checkpoint.get("use_temporal_shift", False)),
         dropout=float(checkpoint.get("dropout", 0.1)),

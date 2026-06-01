@@ -71,6 +71,25 @@ def test_cue_memory_tokenlearner_graph_forward_shape():
     assert out.shape == (2, 3, 2)
 
 
+def test_cue_memory_spatial_relation_variants_forward_shape():
+    batch = make_batch(batch=2, history=4, future=3)
+    for relation_type in ("topk_graph", "none", "full_attention", "local_grid"):
+        model = TwoStreamEgocentricCueMemoryPathPredictor(
+            future_steps=3,
+            backbone_name="small_cnn",
+            hidden_dim=32,
+            num_cue_tokens=4,
+            temporal_type="timesformer",
+            freeze_backbone=False,
+            selector_type="tokenlearner",
+            memory_type="attention",
+            spatial_relation_type=relation_type,
+            spatial_graph_neighbors=3,
+        )
+        out = model(batch)
+        assert out.shape == (2, 3, 2)
+
+
 def test_cue_memory_strnet_tokenlearner_forward_shape():
     batch = make_batch(batch=2, history=4, future=3)
     model = TwoStreamEgocentricCueMemoryPathPredictor(

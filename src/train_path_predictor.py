@@ -7,6 +7,7 @@ from collections import Counter
 import json
 import random
 from pathlib import Path
+import time
 from typing import Any
 
 import torch
@@ -18,33 +19,97 @@ from .models.factory import create_model, needs_rgb
 from .wit_vz.dataset import WITVZPathDataset, collate_path_batch, sample_group_key
 
 
+def _parse_config_scalar(value: str) -> Any:
+    raw = value.strip()
+    if raw == "":
+        return ""
+    lowered = raw.lower()
+    if lowered in {"true", "false"}:
+        return lowered == "true"
+    if lowered in {"none", "null"}:
+        return None
+    if (raw.startswith('"') and raw.endswith('"')) or (raw.startswith("'") and raw.endswith("'")):
+        return raw[1:-1]
+    try:
+        return int(raw)
+    except ValueError:
+        pass
+    try:
+        return float(raw)
+    except ValueError:
+        return raw
+
+
+def load_flat_config(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return {}
+    config: dict[str, Any] = {}
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if ":" not in stripped:
+            raise ValueError(f"Unsupported config line {line_number} in {path}: {line}")
+        key, value = stripped.split(":", 1)
+        config[key.strip()] = _parse_config_scalar(value)
+    return config
+
+
+def normalize_args(args: argparse.Namespace) -> argparse.Namespace:
+    for key in ("dataset", "visual_feature_cache", "output_dir", "config"):
+        value = getattr(args, key, None)
+        if value is not None and not isinstance(value, Path):
+            setattr(args, key, Path(value))
+    if args.spatial_relation_type is None:
+        args.spatial_relation_type = "topk_graph" if args.use_spatial_graph else "none"
+    args.use_spatial_graph = args.spatial_relation_type != "none"
+    return args
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train a WIT-VZ path predictor.")
-    parser.add_argument("--dataset", type=Path, required=True)
-    parser.add_argument("--visual-feature-cache", type=Path, default=None)
-    parser.add_argument("--model", required=True)
-    parser.add_argument("--backbone", default="small_cnn")
-    parser.add_argument("--epochs", type=int, default=5)
-    parser.add_argument("--batch-size", type=int, default=4)
-    parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--weight-decay", type=float, default=1e-4)
-    parser.add_argument("--dropout", type=float, default=0.1)
-    parser.add_argument("--grad-clip-norm", type=float, default=1.0)
-    parser.add_argument("--early-stopping-patience", type=int, default=100)
-    parser.add_argument("--early-stopping-min-delta", type=float, default=0.0)
-    parser.add_argument("--lr-scheduler-patience", type=int, default=25)
-    parser.add_argument("--lr-scheduler-factor", type=float, default=0.5)
-    parser.add_argument("--min-lr", type=float, default=1e-6)
-    parser.add_argument("--hidden-dim", type=int, default=128)
-    parser.add_argument("--image-size", type=int, default=64)
-    parser.add_argument("--loss", choices=["huber", "mse", "l2"], default="huber")
-    parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--seed", type=int, default=7)
-    parser.add_argument("--device", default="auto")
-    parser.add_argument("--num-workers", type=int, default=0)
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument("--config", type=Path, default=None)
+    config_args, _remaining = config_parser.parse_known_args()
+    defaults = load_flat_config(config_args.config)
+
+    def default(key: str, fallback: Any) -> Any:
+        return defaults.get(key, fallback)
+
+    parser = argparse.ArgumentParser(
+        description="Train a WIT-VZ path predictor.",
+        parents=[config_parser],
+    )
+    parser.add_argument("--dataset", type=Path, default=default("dataset", None), required="dataset" not in defaults)
+    parser.add_argument("--visual-feature-cache", type=Path, default=default("visual_feature_cache", None))
+    parser.add_argument("--model", default=default("model", None), required="model" not in defaults)
+    parser.add_argument("--backbone", default=default("backbone", "small_cnn"))
+    parser.add_argument("--epochs", type=int, default=default("epochs", 5))
+    parser.add_argument("--batch-size", type=int, default=default("batch_size", 4))
+    parser.add_argument("--lr", type=float, default=default("lr", 1e-3))
+    parser.add_argument("--weight-decay", type=float, default=default("weight_decay", 1e-4))
+    parser.add_argument("--dropout", type=float, default=default("dropout", 0.1))
+    parser.add_argument("--grad-clip-norm", type=float, default=default("grad_clip_norm", 1.0))
+    parser.add_argument("--early-stopping-patience", type=int, default=default("early_stopping_patience", 100))
+    parser.add_argument("--early-stopping-min-delta", type=float, default=default("early_stopping_min_delta", 0.0))
+    parser.add_argument("--lr-scheduler-patience", type=int, default=default("lr_scheduler_patience", 25))
+    parser.add_argument("--lr-scheduler-factor", type=float, default=default("lr_scheduler_factor", 0.5))
+    parser.add_argument("--min-lr", type=float, default=default("min_lr", 1e-6))
+    parser.add_argument("--hidden-dim", type=int, default=default("hidden_dim", 128))
+    parser.add_argument("--image-size", type=int, default=default("image_size", 64))
+    parser.add_argument("--loss", choices=["huber", "mse", "l2"], default=default("loss", "huber"))
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=default("output_dir", None),
+        required="output_dir" not in defaults,
+    )
+    parser.add_argument("--seed", type=int, default=default("seed", 7))
+    parser.add_argument("--device", default=default("device", "auto"))
+    parser.add_argument("--num-workers", type=int, default=default("num_workers", 0))
     parser.add_argument(
         "--data-parallel",
         action="store_true",
+        default=bool(default("data_parallel", False)),
         help="Wrap the model with torch.nn.DataParallel when multiple CUDA devices are visible.",
     )
     parser.add_argument(
@@ -60,60 +125,85 @@ def parse_args() -> argparse.Namespace:
             "source_map",
             "source_policy",
         ],
-        default="none",
+        default=default("balance_key", "none"),
         help="Metadata group used for train-set balancing.",
     )
     parser.add_argument(
         "--balance-mode",
         choices=["none", "sampler", "loss", "both"],
-        default="none",
+        default=default("balance_mode", "none"),
         help="Apply balancing via WeightedRandomSampler, per-sample loss weights, or both.",
     )
     parser.add_argument(
         "--balance-exponent",
         type=float,
-        default=1.0,
+        default=default("balance_exponent", 1.0),
         help="Inverse-frequency exponent. 1.0 fully balances groups; 0.5 is softer.",
     )
-    parser.add_argument("--freeze-backbone", action="store_true", default=True)
+    parser.add_argument("--freeze-backbone", action="store_true", default=bool(default("freeze_backbone", True)))
     parser.add_argument("--train-backbone", dest="freeze_backbone", action="store_false")
-    parser.add_argument("--mixed-precision", action="store_true")
-    parser.add_argument("--num-cue-tokens", type=int, default=8)
-    parser.add_argument("--num-modes", type=int, default=1)
-    parser.add_argument("--multimodal-confidence-weight", type=float, default=0.05)
-    parser.add_argument("--temporal-type", choices=["transformer", "gru", "timesformer", "strnet"], default="transformer")
-    parser.add_argument("--temporal-layers", type=int, default=1)
+    parser.add_argument("--mixed-precision", action="store_true", default=bool(default("mixed_precision", False)))
+    parser.add_argument("--num-cue-tokens", type=int, default=default("num_cue_tokens", 8))
+    parser.add_argument("--num-modes", type=int, default=default("num_modes", 1))
+    parser.add_argument(
+        "--multimodal-confidence-weight",
+        type=float,
+        default=default("multimodal_confidence_weight", 0.05),
+    )
+    parser.add_argument(
+        "--temporal-type",
+        choices=["transformer", "gru", "timesformer", "strnet"],
+        default=default("temporal_type", "transformer"),
+    )
+    parser.add_argument("--temporal-layers", type=int, default=default("temporal_layers", 1))
     parser.add_argument(
         "--selector-type",
         choices=["query_attention", "tokenlearner", "topk_tokenlearner"],
-        default="query_attention",
+        default=default("selector_type", "query_attention"),
     )
-    parser.add_argument("--selector-layers", type=int, default=1)
-    parser.add_argument("--tokenlearner-pooling", choices=["sigmoid", "softmax"], default="sigmoid")
+    parser.add_argument("--selector-layers", type=int, default=default("selector_layers", 1))
+    parser.add_argument(
+        "--tokenlearner-pooling",
+        choices=["sigmoid", "softmax"],
+        default=default("tokenlearner_pooling", "sigmoid"),
+    )
     parser.add_argument(
         "--memory-type",
         choices=["gru_cell", "attention"],
-        default="gru_cell",
+        default=default("memory_type", "gru_cell"),
     )
-    parser.add_argument("--use-spatial-graph", action="store_true")
-    parser.add_argument("--spatial-graph-neighbors", type=int, default=8)
-    parser.add_argument("--use-temporal-difference-conv", action="store_true")
-    parser.add_argument("--use-temporal-shift", action="store_true")
-    parser.add_argument("--decoder-layers", type=int, default=1)
-    parser.add_argument("--cue-temporal-layers", type=int, default=1)
+    parser.add_argument("--use-spatial-graph", action="store_true", default=bool(default("use_spatial_graph", False)))
+    parser.add_argument("--spatial-graph-neighbors", type=int, default=default("spatial_graph_neighbors", 8))
+    parser.add_argument(
+        "--spatial-relation-type",
+        choices=["topk_graph", "none", "full_attention", "local_grid"],
+        default=default("spatial_relation_type", None),
+    )
+    parser.add_argument(
+        "--use-temporal-difference-conv",
+        action="store_true",
+        default=bool(default("use_temporal_difference_conv", False)),
+    )
+    parser.add_argument("--use-temporal-shift", action="store_true", default=bool(default("use_temporal_shift", False)))
+    parser.add_argument("--decoder-layers", type=int, default=default("decoder_layers", 1))
+    parser.add_argument("--cue-temporal-layers", type=int, default=default("cue_temporal_layers", 1))
     parser.add_argument(
         "--trajectory-scale",
-        default="auto",
+        default=default("trajectory_scale", "auto"),
         help="Coordinate scale for normalized loss. Use 'auto' to estimate from train targets.",
     )
     parser.add_argument(
         "--residual-scale",
-        default="auto",
+        default=default("residual_scale", "auto"),
         help="Scale for learned residual path. Use 'auto' to reuse the resolved trajectory scale.",
     )
-    parser.add_argument("--no-cv-residual", dest="use_constant_velocity_residual", action="store_false")
-    parser.set_defaults(use_constant_velocity_residual=True)
-    return parser.parse_args()
+    parser.add_argument(
+        "--no-cv-residual",
+        dest="use_constant_velocity_residual",
+        action="store_false",
+        default=bool(default("use_constant_velocity_residual", True)),
+    )
+    return normalize_args(parser.parse_args())
 
 
 def set_seed(seed: int) -> None:
@@ -358,6 +448,7 @@ def save_checkpoint(
             "memory_type": args.memory_type,
             "use_spatial_graph": args.use_spatial_graph,
             "spatial_graph_neighbors": args.spatial_graph_neighbors,
+            "spatial_relation_type": args.spatial_relation_type,
             "use_temporal_difference_conv": args.use_temporal_difference_conv,
             "use_temporal_shift": args.use_temporal_shift,
             "multimodal_confidence_weight": args.multimodal_confidence_weight,
@@ -428,6 +519,7 @@ def main() -> None:
         memory_type=args.memory_type,
         use_spatial_graph=args.use_spatial_graph,
         spatial_graph_neighbors=args.spatial_graph_neighbors,
+        spatial_relation_type=args.spatial_relation_type,
         use_temporal_difference_conv=args.use_temporal_difference_conv,
         use_temporal_shift=args.use_temporal_shift,
         dropout=args.dropout,
@@ -439,6 +531,8 @@ def main() -> None:
 
     config = vars(args).copy()
     config["dataset"] = args.dataset.as_posix()
+    if args.config is not None:
+        config["config"] = args.config.as_posix()
     if args.visual_feature_cache is not None:
         config["visual_feature_cache"] = args.visual_feature_cache.as_posix()
     config["output_dir"] = args.output_dir.as_posix()
@@ -495,6 +589,9 @@ def main() -> None:
     history = []
 
     for epoch in range(1, args.epochs + 1):
+        epoch_started = time.perf_counter()
+        if device.type == "cuda":
+            torch.cuda.reset_peak_memory_stats(device)
         model.train()
         total_loss = 0.0
         total_ade = 0.0
@@ -556,7 +653,10 @@ def main() -> None:
             "val_train_ADE_gap": val_metrics["ADE"] - train_ade,
             "lr": current_lr,
             "val": val_metrics,
+            "epoch_seconds": time.perf_counter() - epoch_started,
         }
+        if device.type == "cuda":
+            row["cuda_peak_memory_mb"] = torch.cuda.max_memory_allocated(device) / (1024 * 1024)
         history.append(row)
         print(
             f"epoch={epoch} train_loss={train_loss:.4f} "

@@ -1,0 +1,11 @@
+annotations: .tmp_external/VisualGuidance/data/processed/test_dataset.json
+image_root: .tmp_external/VisualGuidance/data/datasets
+detector_checkpoint: runs/xu_stp/detector_visualguidance/best.pt
+selector_checkpoint: runs/xu_mstp/cue_memory_visualguidance/best.pt
+selector_metrics: runs/xu_mstp/cue_memory_visualguidance/metrics.json
+score_threshold: 0.3
+iou_threshold: 0.5
+max_detections: 3
+device: auto
+output_json: outputs/xu_full_pipeline/results.json
+output_md: reports/xu_full_pipeline.md

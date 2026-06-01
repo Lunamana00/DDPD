@@ -69,15 +69,26 @@ top3_accuracy = whether gt_index is within top-3 candidates
 mean_candidates = average number of STP candidates per frame
 ```
 
-## Remaining Work
+## Full Pipeline
 
-To reproduce Xu end-to-end, the first stage must also be trained/evaluated:
+The STP detector stage is implemented with a VisualGuidance-aligned Faster
+R-CNN detector:
 
-```text
-image -> STP detector -> candidate boxes
-candidate boxes -> cue-memory MSTP selector -> MSTP
+```bash
+python scripts/train_xu_stp_detector.py \
+  --config configs/xu_mstp/train_stp_detector_visualguidance.yaml
+
+python scripts/evaluate_xu_full_pipeline.py \
+  --config configs/xu_mstp/evaluate_full_pipeline_visualguidance.yaml
 ```
 
-The current implementation uses the candidate boxes from the provided
-VisualGuidance processed dataset, so it is a controlled MSTP-selector
-comparison rather than a full STP-detection pipeline.
+The comparison now has two levels:
+
+```text
+oracle candidate boxes -> cue-memory MSTP selector
+detected candidate boxes -> cue-memory MSTP selector
+```
+
+The second line is the actual end-to-end Xu-style pipeline. Detector
+MSTP-recall is reported because it is an upper bound on what the selector can
+recover when GT candidate boxes are removed.

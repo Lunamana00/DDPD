@@ -1,0 +1,770 @@
+{
+  "metrics": {
+    "samples": 95,
+    "score_threshold": 0.3,
+    "iou_threshold": 0.5,
+    "max_detections": 3,
+    "mean_detections": 2.4947368421052634,
+    "mean_gt_boxes": 1.6526315789473685,
+    "no_detection_rate": 0.031578947368421054,
+    "detector_mstp_recall_at_iou": 0.5263157894736842,
+    "end_to_end_mstp_accuracy_at_iou": 0.3684210526315789,
+    "end_to_end_mstp_top3_at_iou": 0.5263157894736842,
+    "oracle_candidate_mstp_available": 1.0,
+    "oracle_candidate_selector_accuracy": 0.8315789473684211,
+    "oracle_candidate_selector_top3_accuracy": 1.0
+  },
+  "per_sample": [
+    {
+      "image_id": "20250408171935_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.7773069143295288,
+      "selected_index": 0,
+      "selected_iou": 0.7773069143295288,
+      "top3_iou": 0.7773069143295288
+    },
+    {
+      "image_id": "20250408172351_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.723639190196991,
+      "selected_index": 0,
+      "selected_iou": 0.723639190196991,
+      "top3_iou": 0.723639190196991
+    },
+    {
+      "image_id": "20250428171851_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.9272517561912537,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.9272517561912537
+    },
+    {
+      "image_id": "20250209222630_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.2559511661529541,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.2559511661529541
+    },
+    {
+      "image_id": "20250408172255_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.03172541782259941,
+      "selected_index": 0,
+      "selected_iou": 0.03172541782259941,
+      "top3_iou": 0.03172541782259941
+    },
+    {
+      "image_id": "20250209221647_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250209224037_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250227171851_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.6576051115989685,
+      "selected_index": 0,
+      "selected_iou": 0.6576051115989685,
+      "top3_iou": 0.6576051115989685
+    },
+    {
+      "image_id": "20250209220415_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250227171711_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.6965081691741943,
+      "selected_index": 0,
+      "selected_iou": 0.3354897201061249,
+      "top3_iou": 0.6965081691741943
+    },
+    {
+      "image_id": "20250408171832_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250324225718_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.5759111642837524,
+      "selected_index": 1,
+      "selected_iou": 0.5759111642837524,
+      "top3_iou": 0.5759111642837524
+    },
+    {
+      "image_id": "20250428170146_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8200913667678833,
+      "selected_index": 1,
+      "selected_iou": 0.8200913667678833,
+      "top3_iou": 0.8200913667678833
+    },
+    {
+      "image_id": "20250428170017_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.5882265567779541,
+      "selected_index": 2,
+      "selected_iou": 0.5882265567779541,
+      "top3_iou": 0.5882265567779541
+    },
+    {
+      "image_id": "20250208194259_1.jpg",
+      "num_detections": 0,
+      "selected_iou": 0.0
+    },
+    {
+      "image_id": "20250428172312_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.0,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250408174345_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.7077491283416748,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.7077491283416748
+    },
+    {
+      "image_id": "20250209223119_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.6607547998428345,
+      "selected_index": 0,
+      "selected_iou": 0.6607547998428345,
+      "top3_iou": 0.6607547998428345
+    },
+    {
+      "image_id": "20250209221812_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.0,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250408172043_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.4895007312297821,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.4895007312297821
+    },
+    {
+      "image_id": "20250208193025_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250208193829_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.8164894580841064,
+      "selected_index": 0,
+      "selected_iou": 0.8164894580841064,
+      "top3_iou": 0.8164894580841064
+    },
+    {
+      "image_id": "20250408172602_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.3830389380455017,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.3830389380455017
+    },
+    {
+      "image_id": "20250209221346_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.3212621510028839,
+      "selected_index": 2,
+      "selected_iou": 0.3212621510028839,
+      "top3_iou": 0.3212621510028839
+    },
+    {
+      "image_id": "20250408170846_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.30046895146369934,
+      "selected_index": 1,
+      "selected_iou": 0.30046895146369934,
+      "top3_iou": 0.30046895146369934
+    },
+    {
+      "image_id": "20250227171615_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.754940390586853,
+      "selected_index": 0,
+      "selected_iou": 0.754940390586853,
+      "top3_iou": 0.754940390586853
+    },
+    {
+      "image_id": "20250408171628_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.687836229801178,
+      "selected_index": 0,
+      "selected_iou": 0.687836229801178,
+      "top3_iou": 0.687836229801178
+    },
+    {
+      "image_id": "20250408171753_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250209223143_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.795839250087738,
+      "selected_index": 0,
+      "selected_iou": 0.795839250087738,
+      "top3_iou": 0.795839250087738
+    },
+    {
+      "image_id": "20250408170454_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.38934430480003357,
+      "selected_index": 1,
+      "selected_iou": 0.38934430480003357,
+      "top3_iou": 0.38934430480003357
+    },
+    {
+      "image_id": "20250208194011_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.38258686661720276,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.38258686661720276
+    },
+    {
+      "image_id": "20250324223014_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.0,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250209214443_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.5042446255683899,
+      "selected_index": 0,
+      "selected_iou": 0.5042446255683899,
+      "top3_iou": 0.5042446255683899
+    },
+    {
+      "image_id": "20250408170211_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8659235239028931,
+      "selected_index": 2,
+      "selected_iou": 0.5229101181030273,
+      "top3_iou": 0.8659235239028931
+    },
+    {
+      "image_id": "20250324225759_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.8283377289772034,
+      "selected_index": 0,
+      "selected_iou": 0.8283377289772034,
+      "top3_iou": 0.8283377289772034
+    },
+    {
+      "image_id": "20250408173106_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8571274876594543,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.8571274876594543
+    },
+    {
+      "image_id": "20250208193009_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.06184322014451027,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.06184322014451027
+    },
+    {
+      "image_id": "20250428165523_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.0,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250209222622_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250408171143_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.2035900354385376,
+      "selected_index": 0,
+      "selected_iou": 0.2035900354385376,
+      "top3_iou": 0.2035900354385376
+    },
+    {
+      "image_id": "20250209223948_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.7044171094894409,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.7044171094894409
+    },
+    {
+      "image_id": "20250209224108_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.3909783661365509,
+      "selected_index": 0,
+      "selected_iou": 0.3909783661365509,
+      "top3_iou": 0.3909783661365509
+    },
+    {
+      "image_id": "20250208194240_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.7129873633384705,
+      "selected_index": 0,
+      "selected_iou": 0.7129873633384705,
+      "top3_iou": 0.7129873633384705
+    },
+    {
+      "image_id": "20250324223035_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8085433840751648,
+      "selected_index": 0,
+      "selected_iou": 0.8085433840751648,
+      "top3_iou": 0.8085433840751648
+    },
+    {
+      "image_id": "20250428172419_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.50325608253479,
+      "selected_index": 2,
+      "selected_iou": 0.20555509626865387,
+      "top3_iou": 0.50325608253479
+    },
+    {
+      "image_id": "20250428173104_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.7981626987457275,
+      "selected_index": 0,
+      "selected_iou": 0.7981626987457275,
+      "top3_iou": 0.7981626987457275
+    },
+    {
+      "image_id": "20250209223853_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.6834076642990112,
+      "selected_index": 0,
+      "selected_iou": 0.6834076642990112,
+      "top3_iou": 0.6834076642990112
+    },
+    {
+      "image_id": "20250408173558_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8469625115394592,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.8469625115394592
+    },
+    {
+      "image_id": "20250209221709_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.5753816962242126,
+      "selected_index": 1,
+      "selected_iou": 0.5753816962242126,
+      "top3_iou": 0.5753816962242126
+    },
+    {
+      "image_id": "20250209214931_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.6900858879089355,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.6900858879089355
+    },
+    {
+      "image_id": "20250428170512_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.713653028011322,
+      "selected_index": 0,
+      "selected_iou": 0.713653028011322,
+      "top3_iou": 0.713653028011322
+    },
+    {
+      "image_id": "20250209223928_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.11981397867202759,
+      "selected_index": 1,
+      "selected_iou": 0.11981397867202759,
+      "top3_iou": 0.11981397867202759
+    },
+    {
+      "image_id": "20250428172507_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8713410496711731,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.8713410496711731
+    },
+    {
+      "image_id": "20250408172452_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.1300436556339264,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.1300436556339264
+    },
+    {
+      "image_id": "20250209220329_1.jpg",
+      "num_detections": 0,
+      "selected_iou": 0.0
+    },
+    {
+      "image_id": "20250408174524_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.7602219581604004,
+      "selected_index": 0,
+      "selected_iou": 0.7602219581604004,
+      "top3_iou": 0.7602219581604004
+    },
+    {
+      "image_id": "20250408173532_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.3649454116821289,
+      "selected_index": 0,
+      "selected_iou": 0.20653198659420013,
+      "top3_iou": 0.3649454116821289
+    },
+    {
+      "image_id": "20250208192238_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.2987549602985382,
+      "selected_index": 1,
+      "selected_iou": 0.2987549602985382,
+      "top3_iou": 0.2987549602985382
+    },
+    {
+      "image_id": "20250428165554_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.0,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250209223007_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.8873544335365295,
+      "selected_index": 0,
+      "selected_iou": 0.8873544335365295,
+      "top3_iou": 0.8873544335365295
+    },
+    {
+      "image_id": "20250408170942_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.7528953552246094,
+      "selected_index": 0,
+      "selected_iou": 0.7528953552246094,
+      "top3_iou": 0.7528953552246094
+    },
+    {
+      "image_id": "20250324225349_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.3715553879737854,
+      "selected_index": 0,
+      "selected_iou": 0.02389160916209221,
+      "top3_iou": 0.3715553879737854
+    },
+    {
+      "image_id": "20250209221740_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250324224555_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.5076078772544861,
+      "selected_index": 2,
+      "selected_iou": 0.20229807496070862,
+      "top3_iou": 0.5076078772544861
+    },
+    {
+      "image_id": "20250428172829_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250408172546_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.9439476728439331,
+      "selected_index": 0,
+      "selected_iou": 0.9439476728439331,
+      "top3_iou": 0.9439476728439331
+    },
+    {
+      "image_id": "20250408171953_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.8452523946762085,
+      "selected_index": 0,
+      "selected_iou": 0.8452523946762085,
+      "top3_iou": 0.8452523946762085
+    },
+    {
+      "image_id": "20250408172945_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8076900839805603,
+      "selected_index": 0,
+      "selected_iou": 0.8076900839805603,
+      "top3_iou": 0.8076900839805603
+    },
+    {
+      "image_id": "20250209221418_1.jpg",
+      "num_detections": 0,
+      "selected_iou": 0.0
+    },
+    {
+      "image_id": "20250408170538_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.6546547412872314,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.6546547412872314
+    },
+    {
+      "image_id": "20250208192635_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.0,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250408171136_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.7912686467170715,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.7912686467170715
+    },
+    {
+      "image_id": "20250408164907_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.0,
+      "selected_index": 0,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250209222141_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.0,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.0
+    },
+    {
+      "image_id": "20250209221718_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.7330440282821655,
+      "selected_index": 1,
+      "selected_iou": 0.7330440282821655,
+      "top3_iou": 0.7330440282821655
+    },
+    {
+      "image_id": "20250208194155_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.6261513829231262,
+      "selected_index": 0,
+      "selected_iou": 0.6261513829231262,
+      "top3_iou": 0.6261513829231262
+    },
+    {
+      "image_id": "20250208192714_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.3867139220237732,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.3867139220237732
+    },
+    {
+      "image_id": "20250208192718_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8151344656944275,
+      "selected_index": 1,
+      "selected_iou": 0.8151344656944275,
+      "top3_iou": 0.8151344656944275
+    },
+    {
+      "image_id": "20250324224630_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.49250349402427673,
+      "selected_index": 2,
+      "selected_iou": 0.0068618496879935265,
+      "top3_iou": 0.49250349402427673
+    },
+    {
+      "image_id": "20250408170946_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8240537643432617,
+      "selected_index": 0,
+      "selected_iou": 0.8240537643432617,
+      "top3_iou": 0.8240537643432617
+    },
+    {
+      "image_id": "20250208194129_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.6871597170829773,
+      "selected_index": 0,
+      "selected_iou": 0.6871597170829773,
+      "top3_iou": 0.6871597170829773
+    },
+    {
+      "image_id": "20250408170424_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.8103384971618652,
+      "selected_index": 0,
+      "selected_iou": 0.8103384971618652,
+      "top3_iou": 0.8103384971618652
+    },
+    {
+      "image_id": "20250428172743_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.6766501665115356,
+      "selected_index": 0,
+      "selected_iou": 0.6766501665115356,
+      "top3_iou": 0.6766501665115356
+    },
+    {
+      "image_id": "20250428173406_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.254835844039917,
+      "selected_index": 1,
+      "selected_iou": 0.0,
+      "top3_iou": 0.254835844039917
+    },
+    {
+      "image_id": "20250408172330_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.07909566909074783,
+      "selected_index": 2,
+      "selected_iou": 0.07909566909074783,
+      "top3_iou": 0.07909566909074783
+    },
+    {
+      "image_id": "20250208194314_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.8250297904014587,
+      "selected_index": 0,
+      "selected_iou": 0.8250297904014587,
+      "top3_iou": 0.8250297904014587
+    },
+    {
+      "image_id": "20250408173310_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.639437735080719,
+      "selected_index": 1,
+      "selected_iou": 0.2801179885864258,
+      "top3_iou": 0.639437735080719
+    },
+    {
+      "image_id": "20250209214625_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.4037550985813141,
+      "selected_index": 1,
+      "selected_iou": 0.1773194968700409,
+      "top3_iou": 0.4037550985813141
+    },
+    {
+      "image_id": "20250209221758_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.08171173930168152,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.08171173930168152
+    },
+    {
+      "image_id": "20250209222326_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.29978230595588684,
+      "selected_index": 2,
+      "selected_iou": 0.0,
+      "top3_iou": 0.29978230595588684
+    },
+    {
+      "image_id": "20250209222850_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.10768511146306992,
+      "selected_index": 1,
+      "selected_iou": 0.10768511146306992,
+      "top3_iou": 0.10768511146306992
+    },
+    {
+      "image_id": "20250408173321_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.8291783332824707,
+      "selected_index": 1,
+      "selected_iou": 0.34060990810394287,
+      "top3_iou": 0.8291783332824707
+    },
+    {
+      "image_id": "20250208192617_1.jpg",
+      "num_detections": 3,
+      "best_detector_iou": 0.4463806450366974,
+      "selected_index": 2,
+      "selected_iou": 0.4463806450366974,
+      "top3_iou": 0.4463806450366974
+    },
+    {
+      "image_id": "20250208194423_1.jpg",
+      "num_detections": 1,
+      "best_detector_iou": 0.6766302585601807,
+      "selected_index": 0,
+      "selected_iou": 0.6766302585601807,
+      "top3_iou": 0.6766302585601807
+    },
+    {
+      "image_id": "20250408171910_1.jpg",
+      "num_detections": 2,
+      "best_detector_iou": 0.5396156311035156,
+      "selected_index": 1,
+      "selected_iou": 0.3985365927219391,
+      "top3_iou": 0.5396156311035156
+    }
+  ]
+}

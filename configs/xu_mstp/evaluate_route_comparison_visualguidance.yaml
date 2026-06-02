@@ -1,0 +1,15 @@
+annotations: .tmp_external/VisualGuidance/data/processed/test_dataset.json
+selector_annotations: .tmp_external/VisualGuidance/data/processed/model2_test_dataset.json
+image_root: .tmp_external/VisualGuidance/data/datasets
+direct_checkpoint: runs/xu_route/direct_cue_memory_visualguidance/best.pt
+selector_checkpoint: runs/xu_mstp/visualguidance_baseline/best.pt
+detector_checkpoint: runs/xu_stp/detector_visualguidance/best.pt
+direct_metrics: runs/xu_route/direct_cue_memory_visualguidance/metrics.json
+selector_metrics: runs/xu_mstp/visualguidance_baseline/metrics.json
+score_threshold: 0.3
+iou_threshold: 0.5
+center_threshold: 0.1
+max_detections: 3
+device: auto
+output_json: outputs/xu_route_comparison/results.json
+output_md: reports/xu_route_comparison.md

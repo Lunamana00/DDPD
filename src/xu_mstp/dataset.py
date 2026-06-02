@@ -139,3 +139,64 @@ def collate_xu_mstp_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
         "candidate_mask": torch.stack(candidate_mask, dim=0),
         "gt_index": torch.stack([item["gt_index"] for item in batch], dim=0),
     }
+
+
+class XuRouteTargetDataset(Dataset):
+    """VisualGuidance screenshot dataset for direct MSTP box prediction."""
+
+    def __init__(
+        self,
+        annotations_file: str | Path,
+        image_root: str | Path,
+        image_size: int = 128,
+    ) -> None:
+        self.annotations_file = Path(annotations_file)
+        self.image_root = Path(image_root)
+        self.image_size = image_size
+        records = _load_records(self.annotations_file)
+        self.records = [
+            item
+            for item in records
+            if item.get("MSTP") or ("candidates" in item and int(item.get("gt_index", -1)) >= 0)
+        ]
+        if not self.records:
+            raise ValueError(f"No valid route target samples found in {annotations_file}")
+        self.image_index = build_image_index(self.image_root)
+
+    def __len__(self) -> int:
+        return len(self.records)
+
+    def _image_path(self, image_id: str) -> Path:
+        path = self.image_index.get(image_id)
+        if path is None:
+            raise FileNotFoundError(f"Could not find image_id={image_id} under {self.image_root}")
+        return path
+
+    @staticmethod
+    def _target_box(record: dict[str, Any]) -> list[float]:
+        if record.get("MSTP"):
+            return record["MSTP"]
+        candidates = record.get("candidates") or []
+        gt_index = int(record.get("gt_index", -1))
+        if gt_index < 0 or gt_index >= len(candidates):
+            raise ValueError(f"Invalid route target record: {record}")
+        return candidates[gt_index]
+
+    def __getitem__(self, index: int) -> dict[str, Any]:
+        record = self.records[index]
+        image_id = str(record["image_id"])
+        image, (width, height) = load_rgb_tensor(self._image_path(image_id), self.image_size)
+        target_box = XuMSTPSelectionDataset._normalize_boxes([self._target_box(record)], width, height)[0]
+        return {
+            "image_id": image_id,
+            "image": image,
+            "target_box": target_box,
+        }
+
+
+def collate_xu_route_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "image_id": [item["image_id"] for item in batch],
+        "image": torch.stack([item["image"] for item in batch], dim=0),
+        "target_box": torch.stack([item["target_box"] for item in batch], dim=0),
+    }

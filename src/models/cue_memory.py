@@ -255,20 +255,22 @@ class RelativeContrastHybridSpatialGraphAggregator(nn.Module):
                 nn.Linear(contrast_hidden, 1),
             )
             self.contrast_score_chunk_size = 128
-            self.contrast_value = nn.Linear(dim, dim)
             self.contrast_message = nn.Sequential(
-                nn.LayerNorm(dim),
-                nn.Linear(dim, dim),
+                nn.LayerNorm(contrast_dim),
+                nn.Linear(contrast_dim, contrast_hidden),
                 nn.GELU(),
                 nn.Dropout(dropout),
-                nn.Linear(dim, dim),
+                nn.Linear(contrast_hidden, contrast_dim),
             )
+            self.contrast_up = nn.Linear(contrast_dim, dim)
+            self.contrast_message_scale = nn.Parameter(torch.tensor(1.0e-3))
         else:
             self.contrast_pair_projection = None
             self.contrast_score = None
             self.contrast_score_chunk_size = 128
-            self.contrast_value = None
             self.contrast_message = None
+            self.contrast_up = None
+            self.contrast_message_scale = None
         self.gate = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, dim), nn.Sigmoid())
         self.out = nn.Sequential(nn.Linear(dim, dim), nn.Dropout(dropout))
 
@@ -307,6 +309,38 @@ class RelativeContrastHybridSpatialGraphAggregator(nn.Module):
             biases.append(self.contrast_score(pairwise_diff).squeeze(-1))
         return torch.cat(biases, dim=0).to(dtype=dtype)
 
+    def _candidate_contrast_message(
+        self,
+        normalized: torch.Tensor,
+        candidate_indices: torch.Tensor,
+        candidate_weights: torch.Tensor,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if (
+            self.contrast_pair_projection is None
+            or self.contrast_message is None
+            or self.contrast_up is None
+            or self.contrast_message_scale is None
+        ):
+            raise RuntimeError("candidate contrast message requested but not initialized")
+        contrast_features = self.contrast_pair_projection(normalized)
+        batch_time, num_tokens, contrast_dim = contrast_features.shape
+        chunk_size = max(1, self.contrast_score_chunk_size)
+        messages = []
+        for start in range(0, batch_time, chunk_size):
+            end = start + chunk_size
+            chunk = contrast_features[start:end]
+            indices = candidate_indices[start:end]
+            weights = candidate_weights[start:end]
+            expanded = chunk[:, None, :, :].expand(-1, num_tokens, -1, -1)
+            gather_index = indices[..., None].expand(-1, -1, -1, contrast_dim)
+            neighbors = torch.gather(expanded, dim=2, index=gather_index)
+            center = chunk[:, :, None, :]
+            edge_messages = self.contrast_message(neighbors - center)
+            messages.append((weights[..., None] * edge_messages).sum(dim=2))
+        contrast_context = torch.cat(messages, dim=0)
+        return (self.contrast_message_scale * self.contrast_up(contrast_context)).to(dtype=dtype)
+
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:
         # tokens: [B, T, N, D]
         batch, time, num_tokens, dim = tokens.shape
@@ -329,8 +363,9 @@ class RelativeContrastHybridSpatialGraphAggregator(nn.Module):
             if (
                 self.contrast_pair_projection is None
                 or self.contrast_score is None
-                or self.contrast_value is None
                 or self.contrast_message is None
+                or self.contrast_up is None
+                or self.contrast_message_scale is None
             ):
                 raise RuntimeError("contrast-aware graph requested but not initialized")
             scores = scores + self._pairwise_contrast_bias(normalized, scores.dtype)
@@ -349,13 +384,25 @@ class RelativeContrastHybridSpatialGraphAggregator(nn.Module):
         if candidate_mask is None:
             return tokens
 
+        candidate_mask = candidate_mask.expand_as(scores)
+        max_candidates = int(candidate_mask.sum(dim=-1).max().detach().cpu().item())
+        if max_candidates <= 0:
+            return tokens
         masked_scores = scores.masked_fill(~candidate_mask, torch.finfo(scores.dtype).min)
-        weights = torch.softmax(masked_scores, dim=-1)
-        context = torch.matmul(weights, value)
+        candidate_scores, candidate_indices = torch.topk(masked_scores, k=max_candidates, dim=-1)
+        valid_candidates = torch.gather(candidate_mask, dim=2, index=candidate_indices)
+        candidate_weights = torch.softmax(candidate_scores, dim=-1).masked_fill(~valid_candidates, 0.0)
+        expanded_value = value[:, None, :, :].expand(-1, num_tokens, -1, -1)
+        gather_index = candidate_indices[..., None].expand(-1, -1, -1, dim)
+        selected_values = torch.gather(expanded_value, dim=2, index=gather_index)
+        context = (candidate_weights[..., None] * selected_values).sum(dim=2)
         if self.use_contrast:
-            contrast_value = self.contrast_value(normalized)
-            contrast_context = torch.matmul(weights, contrast_value) - contrast_value
-            context = context + self.contrast_message(contrast_context)
+            context = context + self._candidate_contrast_message(
+                normalized,
+                candidate_indices,
+                candidate_weights,
+                context.dtype,
+            )
         gate = self.gate(torch.cat([normalized, context], dim=-1))
         aggregated = flat + self.out(gate * context)
         return aggregated.reshape(batch, time, num_tokens, dim)

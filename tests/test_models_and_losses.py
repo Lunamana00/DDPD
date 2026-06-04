@@ -168,6 +168,30 @@ def test_pairwise_contrast_bias_shape():
     assert bias.shape == (3, 4, 4)
 
 
+def test_candidate_contrast_message_shape():
+    aggregator = RelativeContrastHybridSpatialGraphAggregator(
+        dim=16,
+        neighbors=2,
+        use_contrast=True,
+    )
+    normalized = torch.randn(3, 4, 16)
+    candidate_indices = torch.tensor(
+        [
+            [[1, 2], [0, 2], [1, 3], [2, 1]],
+            [[1, 3], [0, 3], [0, 1], [1, 2]],
+            [[2, 3], [2, 0], [3, 1], [0, 1]],
+        ]
+    )
+    candidate_weights = torch.full((3, 4, 2), 0.5)
+    message = aggregator._candidate_contrast_message(
+        normalized,
+        candidate_indices,
+        candidate_weights,
+        normalized.dtype,
+    )
+    assert message.shape == (3, 4, 16)
+
+
 def test_cue_memory_bank_ablation_variants_forward_shape():
     batch = make_batch(batch=2, history=4, future=3)
     for memory_type in (

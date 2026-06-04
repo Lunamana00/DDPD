@@ -42,12 +42,13 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("data/wit_vz/feature_cache/wit_vz_v4_defaults_001_dinov3_convnext_tiny"),
     )
-    parser.add_argument("--run-root", type=Path, default=Path("runs/graph_subset_ablation_v4"))
-    parser.add_argument("--config-root", type=Path, default=Path("configs/graph_subset_ablation_v4"))
-    parser.add_argument("--log-root", type=Path, default=Path("logs/graph_subset_ablation_v4"))
-    parser.add_argument("--output-json", type=Path, default=Path("outputs/graph_subset_ablation_v4/results.json"))
-    parser.add_argument("--report", type=Path, default=Path("reports/graph_subset_ablation_v4.md"))
-    parser.add_argument("--horizons", nargs="+", default=["01s", "03s", "05s"])
+    parser.add_argument("--run-root", type=Path, default=Path("runs/graph_subset_ablation_v4_10s"))
+    parser.add_argument("--config-root", type=Path, default=Path("configs/graph_subset_ablation_v4_10s"))
+    parser.add_argument("--log-root", type=Path, default=Path("logs/graph_subset_ablation_v4_10s"))
+    parser.add_argument("--output-json", type=Path, default=Path("outputs/graph_subset_ablation_v4_10s/results.json"))
+    parser.add_argument("--report", type=Path, default=Path("reports/graph_subset_ablation_v4_10s.md"))
+    parser.add_argument("--horizons", nargs="+", default=["10s"])
+    parser.add_argument("--prefixes", nargs="+", default=["01s", "03s", "05s", "10s"])
     parser.add_argument("--variants", nargs="+", default=list(VARIANTS))
     parser.add_argument("--gpus", nargs="+", default=["0", "1", "2"])
     parser.add_argument("--max-gpu-memory-mb", type=int, default=12000)
@@ -205,6 +206,8 @@ def close_process_log(process: subprocess.Popen) -> None:
 
 
 def summarize(args: argparse.Namespace) -> None:
+    if len(args.horizons) != 1:
+        raise ValueError("Prefix summarization expects exactly one train horizon, e.g. --horizons 10s")
     command = [
         sys.executable,
         "scripts/summarize_graph_subset_ablation_v4.py",
@@ -216,8 +219,10 @@ def summarize(args: argparse.Namespace) -> None:
         args.report.as_posix(),
         "--seed",
         str(args.seed),
-        "--horizons",
-        *args.horizons,
+        "--train-horizon",
+        args.horizons[0],
+        "--prefixes",
+        *args.prefixes,
         "--variants",
         *args.variants,
     ]

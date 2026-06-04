@@ -424,6 +424,7 @@ def evaluate_loader(
                 "target": target[i].detach().cpu().tolist(),
                 "ADE": float(model_errors[i].mean()),
                 "FDE": float(model_errors[i, -1]),
+                "constant_velocity_prediction": cv_pred[i].detach().cpu().tolist(),
                 "constant_velocity_ADE": float(cv_errors[i].mean()),
                 "constant_velocity_FDE": float(cv_errors[i, -1]),
             }

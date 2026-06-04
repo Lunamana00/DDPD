@@ -52,6 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--variants", nargs="+", default=list(VARIANTS))
     parser.add_argument("--gpus", nargs="+", default=["0", "1", "2"])
     parser.add_argument("--max-gpu-memory-mb", type=int, default=12000)
+    parser.add_argument("--max-gpu-util-percent", type=int, default=95)
     parser.add_argument("--poll-seconds", type=int, default=60)
     parser.add_argument("--epochs", type=int, default=80)
     parser.add_argument("--batch-size", type=int, default=512)
@@ -164,10 +165,10 @@ def run_complete(task: Task) -> bool:
     )
 
 
-def gpu_memory_mb() -> dict[str, int]:
+def gpu_stats() -> dict[str, dict[str, int]]:
     query = [
         "nvidia-smi",
-        "--query-gpu=index,memory.used",
+        "--query-gpu=index,memory.used,utilization.gpu",
         "--format=csv,noheader,nounits",
     ]
     try:
@@ -178,8 +179,11 @@ def gpu_memory_mb() -> dict[str, int]:
     for line in output.splitlines():
         if not line.strip():
             continue
-        index, memory = [part.strip() for part in line.split(",", 1)]
-        usage[index] = int(memory)
+        index, memory, utilization = [part.strip() for part in line.split(",", 2)]
+        usage[index] = {
+            "memory_mb": int(memory),
+            "utilization_pct": int(utilization),
+        }
     return usage
 
 
@@ -276,12 +280,16 @@ def main() -> None:
                 f"code={code} log={failed_task.log_path}"
             )
 
-        usage = gpu_memory_mb()
+        usage = gpu_stats()
         for gpu in args.gpus:
             if gpu in running or not pending:
                 continue
-            if usage and usage.get(gpu, 10**9) > args.max_gpu_memory_mb:
-                continue
+            if usage:
+                stats = usage.get(gpu, {"memory_mb": 10**9, "utilization_pct": 100})
+                if stats["memory_mb"] > args.max_gpu_memory_mb:
+                    continue
+                if stats["utilization_pct"] > args.max_gpu_util_percent:
+                    continue
             task = pending.pop(0)
             process = launch(task, gpu, args)
             running[gpu] = (task, process)
@@ -294,7 +302,7 @@ def main() -> None:
                     gpu: {"horizon": task.horizon, "variant": task.variant, "pid": process.pid}
                     for gpu, (task, process) in running.items()
                 },
-                "gpu_memory_mb": usage,
+                "gpu_stats": usage,
             }
             print(json.dumps(status, indent=2))
             time.sleep(max(args.poll_seconds, 5))

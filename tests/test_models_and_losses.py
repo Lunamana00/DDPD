@@ -3,7 +3,12 @@ import torch
 from src.losses import trajectory_loss
 from src.metrics import ade, fde, select_best_trajectory
 from src.models.baselines import ConstantVelocityBaseline, EgoMotionOnlyModel
-from src.models.cue_memory import TwoStreamEgocentricCueMemoryPathPredictor
+from src.models.cue_memory import (
+    LastCueMemoryBank,
+    MeanCueMemoryBank,
+    StaticMemoryBank,
+    TwoStreamEgocentricCueMemoryPathPredictor,
+)
 from src.models.motion import constant_velocity_path
 
 
@@ -51,6 +56,57 @@ def test_cue_memory_transformer_forward_shape():
     assert out.shape == (2, 3, 2)
 
 
+def test_cue_memory_no_temporal_adapter_forward_shape():
+    batch = make_batch(batch=2, history=4, future=3)
+    model = TwoStreamEgocentricCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="small_cnn",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="none",
+        freeze_backbone=False,
+        selector_type="tokenlearner",
+        memory_type="attention",
+        spatial_relation_type="topk_graph",
+        spatial_graph_neighbors=3,
+    )
+    out = model(batch)
+    assert out.shape == (2, 3, 2)
+
+
+def test_cue_memory_zero_visual_backbone_forward_shape():
+    batch = make_batch(batch=2, history=4, future=3)
+    model = TwoStreamEgocentricCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="zero_tokens",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="timesformer",
+        freeze_backbone=True,
+        selector_type="tokenlearner",
+        memory_type="attention",
+    )
+    out = model(batch)
+    assert out.shape == (2, 3, 2)
+
+
+def test_cue_memory_zero_visual_backbone_without_rgb_forward_shape():
+    batch = make_batch(batch=2, history=4, future=3)
+    batch.pop("rgb_history")
+    model = TwoStreamEgocentricCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="zero_tokens",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="timesformer",
+        freeze_backbone=True,
+        selector_type="tokenlearner",
+        memory_type="attention",
+    )
+    out = model(batch)
+    assert out.shape == (2, 3, 2)
+
+
 def test_cue_memory_tokenlearner_graph_forward_shape():
     batch = make_batch(batch=2, history=4, future=3)
     model = TwoStreamEgocentricCueMemoryPathPredictor(
@@ -73,7 +129,17 @@ def test_cue_memory_tokenlearner_graph_forward_shape():
 
 def test_cue_memory_spatial_relation_variants_forward_shape():
     batch = make_batch(batch=2, history=4, future=3)
-    for relation_type in ("topk_graph", "none", "full_attention", "local_grid"):
+    for relation_type in (
+        "topk_graph",
+        "none",
+        "full_attention",
+        "local_grid",
+        "strnet_edge_message",
+        "relpos_topk_graph",
+        "contrast_topk_graph",
+        "hybrid_local_topk_graph",
+        "relpos_contrast_hybrid_graph",
+    ):
         model = TwoStreamEgocentricCueMemoryPathPredictor(
             future_steps=3,
             backbone_name="small_cnn",
@@ -88,6 +154,67 @@ def test_cue_memory_spatial_relation_variants_forward_shape():
         )
         out = model(batch)
         assert out.shape == (2, 3, 2)
+
+
+def test_cue_memory_bank_ablation_variants_forward_shape():
+    batch = make_batch(batch=2, history=4, future=3)
+    for memory_type in (
+        "attention",
+        "attention_no_ego",
+        "gru_cell",
+        "last_cue",
+        "no_memory",
+        "mean_cue",
+        "no_memory_update",
+    ):
+        model = TwoStreamEgocentricCueMemoryPathPredictor(
+            future_steps=3,
+            backbone_name="small_cnn",
+            hidden_dim=32,
+            num_cue_tokens=4,
+            temporal_type="timesformer",
+            freeze_backbone=False,
+            selector_type="tokenlearner",
+            memory_type=memory_type,
+            spatial_relation_type="topk_graph",
+            spatial_graph_neighbors=3,
+        )
+        out = model(batch)
+        assert out.shape == (2, 3, 2)
+
+
+def test_cue_memory_decoder_ablation_variants_forward_shape():
+    batch = make_batch(batch=2, history=4, future=3)
+    for decoder_type in (
+        "horizon_query_decoder",
+        "single_vector_mlp",
+        "shared_query_decoder",
+        "autoregressive_decoder",
+    ):
+        model = TwoStreamEgocentricCueMemoryPathPredictor(
+            future_steps=3,
+            backbone_name="small_cnn",
+            hidden_dim=32,
+            num_cue_tokens=4,
+            temporal_type="timesformer",
+            freeze_backbone=False,
+            selector_type="tokenlearner",
+            memory_type="attention",
+            spatial_relation_type="topk_graph",
+            spatial_graph_neighbors=3,
+            decoder_type=decoder_type,
+        )
+        out = model(batch)
+        assert out.shape == (2, 3, 2)
+
+
+def test_no_update_memory_banks_are_deterministic_pooling_ops():
+    cues = torch.arange(2 * 3 * 4 * 5, dtype=torch.float32).reshape(2, 3, 4, 5)
+    ego = torch.randn(2, 3, 3)
+    assert torch.equal(LastCueMemoryBank()(cues, ego), cues[:, -1])
+    assert torch.equal(MeanCueMemoryBank()(cues, ego), cues.mean(dim=1))
+    static_memory = StaticMemoryBank(dim=5, num_slots=4)
+    assert static_memory(cues, ego).shape == (2, 4, 5)
 
 
 def test_cue_memory_strnet_tokenlearner_forward_shape():
@@ -123,6 +250,21 @@ def test_cue_memory_residual_initializes_to_constant_velocity():
     out = model(batch)
     expected = constant_velocity_path(batch["ego_history"], future_steps=3)
     assert torch.allclose(out, expected, atol=1e-6)
+
+
+def test_cue_memory_no_cv_residual_forward_shape():
+    batch = make_batch(batch=2, history=5, future=3)
+    model = TwoStreamEgocentricCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="small_cnn",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="gru",
+        freeze_backbone=False,
+        use_constant_velocity_residual=False,
+    )
+    out = model(batch)
+    assert out.shape == (2, 3, 2)
 
 
 def test_cue_memory_multimodal_forward_shape():

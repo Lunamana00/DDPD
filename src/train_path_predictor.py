@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 from .losses import trajectory_loss
 from .metrics import ade, fde, per_horizon_error, select_best_trajectory
 from .models.factory import create_model, needs_rgb
+from .models.motion import constant_velocity_path
 from .wit_vz.dataset import WITVZPathDataset, collate_path_batch, sample_group_key
 
 
@@ -95,7 +96,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--lr-scheduler-factor", type=float, default=default("lr_scheduler_factor", 0.5))
     parser.add_argument("--min-lr", type=float, default=default("min_lr", 1e-6))
     parser.add_argument("--hidden-dim", type=int, default=default("hidden_dim", 128))
+    parser.add_argument("--num-motivation-tokens", type=int, default=default("num_motivation_tokens", 4))
+    parser.add_argument("--num-heads", type=int, default=default("num_heads", 4))
     parser.add_argument("--image-size", type=int, default=default("image_size", 64))
+    parser.add_argument(
+        "--history-frame-mode",
+        choices=["full", "last_frame_only"],
+        default=default("history_frame_mode", "full"),
+        help="Use all visual history frames or only the latest aligned frame/token.",
+    )
+    parser.add_argument(
+        "--train-frame-order",
+        choices=["normal", "shuffle"],
+        default=default("train_frame_order", "normal"),
+        help="Frame order augmentation applied to the train split only.",
+    )
     parser.add_argument("--loss", choices=["huber", "mse", "l2"], default=default("loss", "huber"))
     parser.add_argument(
         "--output-dir",
@@ -152,7 +167,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--temporal-type",
-        choices=["transformer", "gru", "timesformer", "strnet"],
+        choices=["transformer", "gru", "timesformer", "strnet", "none", "identity"],
         default=default("temporal_type", "transformer"),
     )
     parser.add_argument("--temporal-layers", type=int, default=default("temporal_layers", 1))
@@ -169,14 +184,34 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--memory-type",
-        choices=["gru_cell", "attention"],
+        choices=[
+            "gru_cell",
+            "gru_no_ego",
+            "attention",
+            "attention_no_ego",
+            "last_cue",
+            "no_memory",
+            "mean_cue",
+            "no_memory_update",
+        ],
         default=default("memory_type", "gru_cell"),
     )
     parser.add_argument("--use-spatial-graph", action="store_true", default=bool(default("use_spatial_graph", False)))
     parser.add_argument("--spatial-graph-neighbors", type=int, default=default("spatial_graph_neighbors", 8))
     parser.add_argument(
         "--spatial-relation-type",
-        choices=["topk_graph", "none", "full_attention", "local_grid"],
+        choices=[
+            "topk_graph",
+            "none",
+            "full_attention",
+            "local_grid",
+            "strnet_edge_message",
+            "relpos_topk_graph",
+            "contrast_topk_graph",
+            "hybrid_local_topk_graph",
+            "relpos_contrast_topk_graph",
+            "relpos_contrast_hybrid_graph",
+        ],
         default=default("spatial_relation_type", None),
     )
     parser.add_argument(
@@ -186,6 +221,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--use-temporal-shift", action="store_true", default=bool(default("use_temporal_shift", False)))
     parser.add_argument("--decoder-layers", type=int, default=default("decoder_layers", 1))
+    parser.add_argument(
+        "--decoder-type",
+        choices=[
+            "horizon_query_decoder",
+            "single_vector_mlp",
+            "shared_query_decoder",
+            "autoregressive_decoder",
+        ],
+        default=default("decoder_type", "horizon_query_decoder"),
+    )
     parser.add_argument("--cue-temporal-layers", type=int, default=default("cue_temporal_layers", 1))
     parser.add_argument(
         "--trajectory-scale",
@@ -344,6 +389,9 @@ def evaluate_loader(
     total_fde = 0.0
     total_count = 0
     horizon_errors = []
+    cv_horizon_errors = []
+    model_errors_for_subset = []
+    cv_errors_for_subset = []
     predictions = []
     for batch in loader:
         batch = move_batch(batch, device)
@@ -357,19 +405,27 @@ def evaluate_loader(
             multimodal_confidence_weight=multimodal_confidence_weight,
         )
         selected_pred = select_best_trajectory(pred, target)
+        model_errors = torch.linalg.norm(selected_pred - target, dim=-1).detach().cpu()
+        cv_pred = constant_velocity_path(batch["ego_history"], target.shape[1])
+        cv_errors = torch.linalg.norm(cv_pred - target, dim=-1).detach().cpu()
         batch_size = target.shape[0]
         total_loss += float(loss.detach().cpu()) * batch_size
         total_ade += float(ade(pred, target).detach().cpu()) * batch_size
         total_fde += float(fde(pred, target).detach().cpu()) * batch_size
         horizon_errors.append(per_horizon_error(pred, target).detach().cpu() * batch_size)
+        cv_horizon_errors.append(cv_errors.sum(dim=0))
+        model_errors_for_subset.append(model_errors)
+        cv_errors_for_subset.append(cv_errors)
         total_count += batch_size
         for i, sample_id in enumerate(batch["sample_id"]):
             item = {
                 "sample_id": sample_id,
                 "prediction": selected_pred[i].detach().cpu().tolist(),
                 "target": target[i].detach().cpu().tolist(),
-                "ADE": float(torch.linalg.norm(selected_pred[i] - target[i], dim=-1).mean().detach().cpu()),
-                "FDE": float(torch.linalg.norm(selected_pred[i, -1] - target[i, -1]).detach().cpu()),
+                "ADE": float(model_errors[i].mean()),
+                "FDE": float(model_errors[i, -1]),
+                "constant_velocity_ADE": float(cv_errors[i].mean()),
+                "constant_velocity_FDE": float(cv_errors[i, -1]),
             }
             if isinstance(pred, dict):
                 item["candidate_predictions"] = pred["paths"][i].detach().cpu().tolist()
@@ -379,12 +435,37 @@ def evaluate_loader(
     if total_count == 0:
         raise ValueError("Evaluation loader produced no samples")
     per_h = torch.stack(horizon_errors, dim=0).sum(dim=0) / total_count
-    return {
+    cv_per_h = torch.stack(cv_horizon_errors, dim=0).sum(dim=0) / total_count
+    all_model_errors = torch.cat(model_errors_for_subset, dim=0)
+    all_cv_errors = torch.cat(cv_errors_for_subset, dim=0)
+    cv_ade_per_sample = all_cv_errors.mean(dim=1)
+    hard_threshold = torch.quantile(cv_ade_per_sample, 0.75)
+    hard_mask = cv_ade_per_sample >= hard_threshold
+    hard_model_errors = all_model_errors[hard_mask]
+    hard_cv_errors = all_cv_errors[hard_mask]
+    metrics = {
         "loss": total_loss / total_count,
         "ADE": total_ade / total_count,
         "FDE": total_fde / total_count,
         "per_horizon_error": per_h.tolist(),
-    }, predictions
+        "cv_baseline": {
+            "ADE": float(all_cv_errors.mean()),
+            "FDE": float(all_cv_errors[:, -1].mean()),
+            "per_horizon_error": cv_per_h.tolist(),
+        },
+        "cv_hard_subset": {
+            "definition": "top_25pct_by_constant_velocity_ADE_within_split",
+            "cv_ade_quantile": 0.75,
+            "cv_ade_threshold": float(hard_threshold),
+            "samples": int(hard_mask.sum().item()),
+            "ADE": float(hard_model_errors.mean()),
+            "FDE": float(hard_model_errors[:, -1].mean()),
+            "per_horizon_error": hard_model_errors.mean(dim=0).tolist(),
+            "cv_ADE": float(hard_cv_errors.mean()),
+            "cv_FDE": float(hard_cv_errors[:, -1].mean()),
+        },
+    }
+    return metrics, predictions
 
 
 def make_loader(args: argparse.Namespace, split: str, load_rgb: bool) -> DataLoader:
@@ -394,6 +475,8 @@ def make_loader(args: argparse.Namespace, split: str, load_rgb: bool) -> DataLoa
         image_size=args.image_size,
         load_rgb=load_rgb,
         visual_feature_cache_dir=getattr(args, "visual_feature_cache", None),
+        history_frame_mode=getattr(args, "history_frame_mode", "full"),
+        frame_order=getattr(args, "train_frame_order", "normal") if split == "train" else "normal",
     )
     sampler = None
     shuffle = split == "train"
@@ -443,15 +526,20 @@ def save_checkpoint(
                 args.visual_feature_cache.as_posix() if args.visual_feature_cache is not None else None
             ),
             "hidden_dim": args.hidden_dim,
+            "num_motivation_tokens": args.num_motivation_tokens,
+            "num_heads": args.num_heads,
             "image_size": args.image_size,
             "future_steps": dataset_manifest["future_steps"],
             "history_frames": dataset_manifest["history_frames"],
+            "history_frame_mode": args.history_frame_mode,
+            "train_frame_order": args.train_frame_order,
             "freeze_backbone": args.freeze_backbone,
             "num_cue_tokens": args.num_cue_tokens,
             "num_modes": args.num_modes,
             "temporal_layers": args.temporal_layers,
             "selector_layers": args.selector_layers,
             "decoder_layers": args.decoder_layers,
+            "decoder_type": args.decoder_type,
             "cue_temporal_layers": args.cue_temporal_layers,
             "tokenlearner_pooling": args.tokenlearner_pooling,
             "selector_type": args.selector_type,
@@ -491,7 +579,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     device = choose_device(args.device)
     dataset_manifest = json.loads((args.dataset / "dataset_manifest.json").read_text())
-    load_rgb = needs_rgb(args.model) and args.visual_feature_cache is None
+    load_rgb = needs_rgb(args.model, args.backbone) and args.visual_feature_cache is None
 
     train_loader = make_loader(args, "train", load_rgb)
     val_loader = make_loader(args, "val", load_rgb)
@@ -523,6 +611,7 @@ def main() -> None:
         temporal_layers=args.temporal_layers,
         selector_layers=args.selector_layers,
         decoder_layers=args.decoder_layers,
+        decoder_type=args.decoder_type,
         cue_temporal_layers=args.cue_temporal_layers,
         tokenlearner_pooling=args.tokenlearner_pooling,
         selector_type=args.selector_type,
@@ -535,6 +624,8 @@ def main() -> None:
         dropout=args.dropout,
         use_constant_velocity_residual=args.use_constant_velocity_residual,
         residual_scale=residual_scale,
+        num_motivation_tokens=args.num_motivation_tokens,
+        num_heads=args.num_heads,
     ).to(device)
     if args.data_parallel and device.type == "cuda" and torch.cuda.device_count() > 1:
         model = torch.nn.DataParallel(model)

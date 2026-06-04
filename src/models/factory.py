@@ -7,7 +7,9 @@ from torch import nn
 from .baselines import (
     ConstantVelocityBaseline,
     EgoMotionOnlyModel,
+    KhalequeMotivatedExplorerBaseline,
     LastFrameVisualBaseline,
+    XuPixelsOnlyTrajectoryBaseline,
     VideoHistoryBaseline,
 )
 from .cue_memory import TwoStreamEgocentricCueMemoryPathPredictor
@@ -29,6 +31,7 @@ def create_model(
             future_steps=future_steps,
             hidden_dim=hidden_dim,
             layers=int(kwargs.get("ego_layers", 1)),
+            dropout=float(kwargs.get("dropout", 0.0)),
         )
     if name == "last_frame_dino":
         return LastFrameVisualBaseline(
@@ -43,6 +46,24 @@ def create_model(
             backbone_name=backbone_name,
             hidden_dim=hidden_dim,
             freeze_backbone=freeze_backbone,
+            dropout=float(kwargs.get("dropout", 0.0)),
+        )
+    if name == "xu_pixels_only_baseline":
+        return XuPixelsOnlyTrajectoryBaseline(
+            future_steps=future_steps,
+            backbone_name=backbone_name,
+            hidden_dim=hidden_dim,
+            freeze_backbone=freeze_backbone,
+            dropout=float(kwargs.get("dropout", 0.1)),
+        )
+    if name == "khaleque_motivated_baseline":
+        return KhalequeMotivatedExplorerBaseline(
+            future_steps=future_steps,
+            hidden_dim=hidden_dim,
+            ego_layers=int(kwargs.get("ego_layers", 1)),
+            num_motivation_tokens=int(kwargs.get("num_motivation_tokens", 4)),
+            num_heads=int(kwargs.get("num_heads", 4)),
+            dropout=float(kwargs.get("dropout", 0.1)),
         )
     if name == "cue_memory_path_predictor":
         return TwoStreamEgocentricCueMemoryPathPredictor(
@@ -65,6 +86,7 @@ def create_model(
             use_temporal_difference_conv=bool(kwargs.get("use_temporal_difference_conv", False)),
             use_temporal_shift=bool(kwargs.get("use_temporal_shift", False)),
             decoder_layers=int(kwargs.get("decoder_layers", 1)),
+            decoder_type=str(kwargs.get("decoder_type", "horizon_query_decoder")),
             cue_temporal_layers=int(kwargs.get("cue_temporal_layers", 1)),
             dropout=float(kwargs.get("dropout", 0.1)),
             use_constant_velocity_residual=bool(kwargs.get("use_constant_velocity_residual", True)),
@@ -74,9 +96,12 @@ def create_model(
     raise ValueError(f"Unknown model: {model_name}")
 
 
-def needs_rgb(model_name: str) -> bool:
+def needs_rgb(model_name: str, backbone_name: str | None = None) -> bool:
+    if backbone_name is not None and backbone_name.lower() in {"zero_tokens", "zero_visual", "no_visual"}:
+        return False
     return model_name.lower() in {
         "last_frame_dino",
         "video_history_dino",
+        "xu_pixels_only_baseline",
         "cue_memory_path_predictor",
     }

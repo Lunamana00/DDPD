@@ -77,6 +77,8 @@ class WITVZPathDataset(Dataset):
         image_size: int | tuple[int, int] = 64,
         load_rgb: bool = True,
         visual_feature_cache_dir: str | Path | None = None,
+        history_frame_mode: str = "full",
+        frame_order: str = "normal",
     ) -> None:
         self.dataset_dir = Path(dataset_dir)
         self.manifest = load_json(self.dataset_dir / "dataset_manifest.json")
@@ -84,6 +86,12 @@ class WITVZPathDataset(Dataset):
         self.raw_dir = next(iter(self.raw_dirs.values()))
         self.image_size = image_size
         self.load_rgb = load_rgb
+        self.history_frame_mode = history_frame_mode.lower()
+        self.frame_order = frame_order.lower()
+        if self.history_frame_mode not in {"full", "last_frame_only"}:
+            raise ValueError(f"Unsupported history_frame_mode: {history_frame_mode}")
+        if self.frame_order not in {"normal", "shuffle"}:
+            raise ValueError(f"Unsupported frame_order: {frame_order}")
         self.visual_feature_cache_dir = (
             Path(visual_feature_cache_dir) if visual_feature_cache_dir is not None else None
         )
@@ -129,19 +137,31 @@ class WITVZPathDataset(Dataset):
             return self.raw_dirs[selected_source_id] / path
         return self.raw_dir / path
 
+    def _history_indices(self, length: int) -> list[int]:
+        if length <= 0:
+            raise ValueError("History must contain at least one frame")
+        indices = [length - 1] if self.history_frame_mode == "last_frame_only" else list(range(length))
+        if self.frame_order == "shuffle" and len(indices) > 1:
+            order = torch.randperm(len(indices)).tolist()
+            indices = [indices[i] for i in order]
+        return indices
+
     def __getitem__(self, index: int) -> dict[str, Any]:
         sample = self.samples[index]
+        history_indices = self._history_indices(len(sample["rgb_history_paths"]))
+        rgb_history_paths = [sample["rgb_history_paths"][i] for i in history_indices]
+        ego_history = torch.tensor(sample["relative_egomotion_history"], dtype=torch.float32)[history_indices]
         item: dict[str, Any] = {
             "sample_id": sample["sample_id"],
             "episode_id": sample["episode_id"],
             "center_step": sample["center_step"],
-            "ego_history": torch.tensor(sample["relative_egomotion_history"], dtype=torch.float32),
+            "ego_history": ego_history,
             "future_path": torch.tensor(sample["future_local_path"], dtype=torch.float32),
             "metadata": sample.get("metadata", {}),
             "source": sample.get("source", {}),
             "balance": sample_balance_metadata(sample),
             "current_pose": sample.get("current_pose"),
-            "rgb_history_paths": sample["rgb_history_paths"],
+            "rgb_history_paths": rgb_history_paths,
         }
         source_id = (
             item["source"].get("source_id")
@@ -151,7 +171,7 @@ class WITVZPathDataset(Dataset):
         if self.load_rgb:
             frames = [
                 load_rgb_tensor(self._resolve_raw_path(path, source_id), self.image_size)
-                for path in sample["rgb_history_paths"]
+                for path in rgb_history_paths
             ]
             item["rgb_history"] = torch.stack(frames, dim=0)
         if self.visual_feature_cache_dir is not None:
@@ -163,7 +183,7 @@ class WITVZPathDataset(Dataset):
                 tokens = cached["visual_tokens"]
             else:
                 tokens = cached
-            item["visual_tokens"] = tokens.float()
+            item["visual_tokens"] = tokens[history_indices].float()
         return item
 
 

@@ -18,7 +18,7 @@ def write_jsonl(path: Path, rows):
     path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
 
 
-def test_processed_dataset_sample_shapes(tmp_path):
+def test_processed_dataset_sample_shapes(tmp_path, monkeypatch):
     raw = tmp_path / "raw" / "run"
     frame_dir = raw / "episodes" / "episode_000001" / "frames"
     frame_dir.mkdir(parents=True)
@@ -48,7 +48,7 @@ def test_processed_dataset_sample_shapes(tmp_path):
                     "episodes/episode_000001/frames/000001.png",
                     "episodes/episode_000001/frames/000002.png",
                 ],
-                "relative_egomotion_history": [[0, 0, 0], [1, 0, 0], [1, 0, 0]],
+                "relative_egomotion_history": [[0, 0, 0], [1, 0, 0], [2, 0, 0]],
                 "future_local_path": [[1, 0], [2, 0]],
                 "future_world_path": [{"x": 1, "y": 0}, {"x": 2, "y": 0}],
                 "current_pose": {"x": 0, "y": 0, "angle": 0},
@@ -75,7 +75,8 @@ def test_processed_dataset_sample_shapes(tmp_path):
     cache = tmp_path / "feature_cache"
     feature_dir = cache / "features"
     feature_dir.mkdir(parents=True)
-    torch.save({"visual_tokens": torch.ones(3, 4, 8)}, feature_dir / "s1.pt")
+    visual_tokens = torch.arange(3 * 4 * 8, dtype=torch.float32).reshape(3, 4, 8)
+    torch.save({"visual_tokens": visual_tokens}, feature_dir / "s1.pt")
 
     cached_dataset = WITVZPathDataset(
         processed,
@@ -91,6 +92,37 @@ def test_processed_dataset_sample_shapes(tmp_path):
     batch = collate_path_batch([cached_item, cached_item])
     assert batch["visual_tokens"].shape == (2, 3, 4, 8)
     assert batch["balance"][0]["policy"] == "corridor"
+
+    last_frame_dataset = WITVZPathDataset(
+        processed,
+        split="train",
+        image_size=16,
+        load_rgb=False,
+        visual_feature_cache_dir=cache,
+        history_frame_mode="last_frame_only",
+    )
+    last_frame_item = last_frame_dataset[0]
+    assert last_frame_item["rgb_history_paths"] == ["episodes/episode_000001/frames/000002.png"]
+    assert last_frame_item["ego_history"].tolist() == [[2.0, 0.0, 0.0]]
+    assert torch.equal(last_frame_item["visual_tokens"], visual_tokens[-1:])
+
+    monkeypatch.setattr(torch, "randperm", lambda length: torch.tensor([2, 0, 1]))
+    shuffled_dataset = WITVZPathDataset(
+        processed,
+        split="train",
+        image_size=16,
+        load_rgb=False,
+        visual_feature_cache_dir=cache,
+        frame_order="shuffle",
+    )
+    shuffled_item = shuffled_dataset[0]
+    assert shuffled_item["rgb_history_paths"] == [
+        "episodes/episode_000001/frames/000002.png",
+        "episodes/episode_000001/frames/000000.png",
+        "episodes/episode_000001/frames/000001.png",
+    ]
+    assert shuffled_item["ego_history"][:, 0].tolist() == [2.0, 0.0, 1.0]
+    assert torch.equal(shuffled_item["visual_tokens"], visual_tokens[[2, 0, 1]])
 
 
 def test_processed_dataset_resolves_source_prefixed_raw_paths(tmp_path):

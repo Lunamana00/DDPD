@@ -47,12 +47,15 @@ def main() -> None:
         backbone_name=str(checkpoint.get("backbone", "small_cnn")),
         hidden_dim=int(checkpoint.get("hidden_dim", 128)),
         freeze_backbone=bool(checkpoint.get("freeze_backbone", True)),
+        num_motivation_tokens=int(checkpoint.get("num_motivation_tokens", 4)),
+        num_heads=int(checkpoint.get("num_heads", 4)),
         num_cue_tokens=int(checkpoint.get("num_cue_tokens", 8)),
         num_modes=int(checkpoint.get("num_modes", 1)),
         temporal_type=str(checkpoint.get("temporal_type", "transformer")),
         temporal_layers=int(checkpoint.get("temporal_layers", 1)),
         selector_layers=int(checkpoint.get("selector_layers", 1)),
         decoder_layers=int(checkpoint.get("decoder_layers", 1)),
+        decoder_type=str(checkpoint.get("decoder_type", "horizon_query_decoder")),
         cue_temporal_layers=int(checkpoint.get("cue_temporal_layers", 0)),
         tokenlearner_pooling=str(checkpoint.get("tokenlearner_pooling", "softmax")),
         selector_type=str(checkpoint.get("selector_type", "query_attention")),
@@ -74,8 +77,14 @@ def main() -> None:
         image_size=int(checkpoint.get("image_size", 64)),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
+        history_frame_mode=str(checkpoint.get("history_frame_mode", "full")),
+        train_frame_order="normal",
     )
-    loader = make_loader(loader_args, args.split, needs_rgb(model_name) and visual_feature_cache is None)
+    loader = make_loader(
+        loader_args,
+        args.split,
+        needs_rgb(model_name, str(checkpoint.get("backbone", "small_cnn"))) and visual_feature_cache is None,
+    )
     metrics, predictions = evaluate_loader(
         model,
         loader,

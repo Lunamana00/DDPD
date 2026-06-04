@@ -6,6 +6,7 @@ from src.models.baselines import ConstantVelocityBaseline, EgoMotionOnlyModel
 from src.models.cue_memory import (
     LastCueMemoryBank,
     MeanCueMemoryBank,
+    RelativeContrastHybridSpatialGraphAggregator,
     StaticMemoryBank,
     TwoStreamEgocentricCueMemoryPathPredictor,
 )
@@ -154,6 +155,17 @@ def test_cue_memory_spatial_relation_variants_forward_shape():
         )
         out = model(batch)
         assert out.shape == (2, 3, 2)
+
+
+def test_pairwise_contrast_bias_shape():
+    aggregator = RelativeContrastHybridSpatialGraphAggregator(
+        dim=16,
+        neighbors=2,
+        use_contrast=True,
+    )
+    normalized = torch.randn(3, 4, 16)
+    bias = aggregator._pairwise_contrast_bias(normalized, normalized.dtype)
+    assert bias.shape == (3, 4, 4)
 
 
 def test_cue_memory_bank_ablation_variants_forward_shape():

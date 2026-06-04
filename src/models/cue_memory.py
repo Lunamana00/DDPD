@@ -242,13 +242,19 @@ class RelativeContrastHybridSpatialGraphAggregator(nn.Module):
         else:
             self.relative_bias = None
         if use_contrast:
+            contrast_dim = max(8, min(32, dim // 8))
             contrast_hidden = max(16, dim // 4)
-            self.contrast_score = nn.Sequential(
+            self.contrast_pair_projection = nn.Sequential(
                 nn.LayerNorm(dim),
-                nn.Linear(dim, contrast_hidden),
+                nn.Linear(dim, contrast_dim),
+            )
+            self.contrast_score = nn.Sequential(
+                nn.LayerNorm(contrast_dim),
+                nn.Linear(contrast_dim, contrast_hidden),
                 nn.GELU(),
                 nn.Linear(contrast_hidden, 1),
             )
+            self.contrast_score_chunk_size = 128
             self.contrast_value = nn.Linear(dim, dim)
             self.contrast_message = nn.Sequential(
                 nn.LayerNorm(dim),
@@ -258,7 +264,9 @@ class RelativeContrastHybridSpatialGraphAggregator(nn.Module):
                 nn.Linear(dim, dim),
             )
         else:
+            self.contrast_pair_projection = None
             self.contrast_score = None
+            self.contrast_score_chunk_size = 128
             self.contrast_value = None
             self.contrast_message = None
         self.gate = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, dim), nn.Sigmoid())
@@ -287,6 +295,18 @@ class RelativeContrastHybridSpatialGraphAggregator(nn.Module):
         features = self._relative_features(num_tokens, device, parameter.dtype)
         return self.relative_bias(features).squeeze(-1).to(dtype=dtype)
 
+    def _pairwise_contrast_bias(self, normalized: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+        if self.contrast_pair_projection is None or self.contrast_score is None:
+            raise RuntimeError("pairwise contrast score requested but not initialized")
+        contrast_features = self.contrast_pair_projection(normalized)
+        chunk_size = max(1, self.contrast_score_chunk_size)
+        biases = []
+        for start in range(0, contrast_features.shape[0], chunk_size):
+            chunk = contrast_features[start : start + chunk_size]
+            pairwise_diff = chunk[:, None, :, :] - chunk[:, :, None, :]
+            biases.append(self.contrast_score(pairwise_diff).squeeze(-1))
+        return torch.cat(biases, dim=0).to(dtype=dtype)
+
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:
         # tokens: [B, T, N, D]
         batch, time, num_tokens, dim = tokens.shape
@@ -306,10 +326,14 @@ class RelativeContrastHybridSpatialGraphAggregator(nn.Module):
             scores = scores + rel_bias[None, :, :]
 
         if self.use_contrast:
-            if self.contrast_score is None or self.contrast_value is None or self.contrast_message is None:
+            if (
+                self.contrast_pair_projection is None
+                or self.contrast_score is None
+                or self.contrast_value is None
+                or self.contrast_message is None
+            ):
                 raise RuntimeError("contrast-aware graph requested but not initialized")
-            contrast_scalar = self.contrast_score(normalized).squeeze(-1)
-            scores = scores + contrast_scalar[:, None, :] - contrast_scalar[:, :, None]
+            scores = scores + self._pairwise_contrast_bias(normalized, scores.dtype)
 
         eye = torch.eye(num_tokens, device=tokens.device, dtype=torch.bool)[None, :, :]
         scores = scores.masked_fill(eye, torch.finfo(scores.dtype).min)

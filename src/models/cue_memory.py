@@ -1115,6 +1115,91 @@ def build_cue_memory_bank(
     raise ValueError(f"Unknown memory_type: {memory_type}")
 
 
+class EpisodicCueLongMemoryBank(nn.Module):
+    """Across-window cue memory updated once per prediction window.
+
+    This module is intentionally separate from ``AttentionCueMemoryBank``. The
+    existing cue memory summarizes the frames inside one 1-second sample, while
+    this bank carries state across consecutive samples from the same episode.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_slots: int,
+        ego_dim: int = 3,
+        dropout: float = 0.1,
+        use_ego: bool = True,
+        memory_type: str = "gated_attention",
+    ) -> None:
+        super().__init__()
+        normalized = memory_type.lower()
+        if normalized in {"attention_no_ego", "gated_attention_no_ego", "no_ego"}:
+            use_ego = False
+            normalized = "gated_attention"
+        if normalized not in {"attention", "gated_attention", "gated_forget"}:
+            raise ValueError(f"Unsupported episodic long memory type: {memory_type}")
+        self.memory_type = normalized
+        self.use_ego = use_ego
+        self.initial_memory = nn.Parameter(torch.zeros(num_slots, dim))
+        self.ego_mlp = nn.Sequential(nn.Linear(ego_dim, dim), nn.GELU(), nn.Linear(dim, dim)) if use_ego else None
+        self.cue_projection = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim, dim),
+        )
+        self.query = nn.Linear(dim, dim)
+        self.key = nn.Linear(dim, dim)
+        self.value = nn.Linear(dim, dim)
+        self.write_gate = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, dim), nn.Sigmoid())
+        self.write_candidate = nn.Sequential(
+            nn.LayerNorm(dim * 2),
+            nn.Linear(dim * 2, dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim, dim),
+        )
+        self.forget_gate = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, dim), nn.Sigmoid())
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(dim)
+
+    def initial_state(self, batch_size: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+        return self.initial_memory.to(device=device, dtype=dtype)[None, :, :].expand(batch_size, -1, -1)
+
+    def forward(
+        self,
+        memory: torch.Tensor,
+        short_memory: torch.Tensor,
+        ego_history: torch.Tensor,
+    ) -> torch.Tensor:
+        # memory: [B, M, D], short_memory: [B, K, D], ego_history: [B, T, 3]
+        batch, _slots, dim = memory.shape
+        if self.use_ego:
+            if self.ego_mlp is None:
+                raise RuntimeError("ego_mlp is required when use_ego=True")
+            ego = self.ego_mlp(ego_history.sum(dim=1))[:, None, :]
+        else:
+            ego = short_memory.new_zeros(batch, 1, dim)
+        cues = self.cue_projection(short_memory + ego)
+        query = self.query(self.norm(memory))
+        key = self.key(cues)
+        value = self.value(cues)
+        scores = torch.matmul(query, key.transpose(1, 2)) / math.sqrt(dim)
+        weights = torch.softmax(scores, dim=-1)
+        context = torch.matmul(weights, value)
+        if self.memory_type == "attention":
+            return self.norm(memory + self.dropout(context))
+        write_input = torch.cat([memory, context], dim=-1)
+        candidate = self.write_candidate(write_input)
+        write = self.write_gate(write_input)
+        if self.memory_type == "gated_forget":
+            forget = self.forget_gate(write_input)
+            return self.norm(forget * memory + write * candidate)
+        return self.norm(memory + write * (candidate - memory))
+
+
 class PathQueryDecoder(nn.Module):
     def __init__(
         self,
@@ -1400,7 +1485,7 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             zero_init_output=use_constant_velocity_residual,
         )
 
-    def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor | dict[str, torch.Tensor]:
+    def encode_memory(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         if "visual_tokens" in batch:
             tokens = batch["visual_tokens"].float()
         elif isinstance(self.visual_encoder, ZeroVisualTokenEncoder) and "rgb_history" not in batch:
@@ -1421,12 +1506,194 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             cues.append(self.selector(tokens[:, t, :, :]))
         cues_over_time = torch.stack(cues, dim=1)
         cues_over_time = self.cue_temporal(cues_over_time)
-        memory = self.memory(cues_over_time, batch["ego_history"])
+        return self.memory(cues_over_time, batch["ego_history"])
+
+    def decode_memory(
+        self,
+        memory: torch.Tensor,
+        ego_history: torch.Tensor,
+    ) -> torch.Tensor | dict[str, torch.Tensor]:
         decoded = self.decoder(memory)
         if not self.use_constant_velocity_residual:
             return decoded
-        base = constant_velocity_path(batch["ego_history"], self.future_steps)
+        base = constant_velocity_path(ego_history, self.future_steps)
         if isinstance(decoded, dict):
             paths = base[:, None, :, :] + decoded["paths"] * self.residual_scale.to(decoded["paths"].dtype)
             return {"paths": paths, "logits": decoded["logits"]}
         return base + decoded * self.residual_scale.to(decoded.dtype)
+
+    def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor | dict[str, torch.Tensor]:
+        memory = self.encode_memory(batch)
+        return self.decode_memory(memory, batch["ego_history"])
+
+
+class EpisodicLongTermCueMemoryPathPredictor(nn.Module):
+    """Path predictor with memory carried across consecutive WIT-VZ windows."""
+
+    def __init__(
+        self,
+        future_steps: int,
+        backbone_name: str = "small_cnn",
+        hidden_dim: int = 128,
+        freeze_backbone: bool = True,
+        use_bottleneck_adapters: bool = True,
+        adapter_bottleneck_dim: int = 64,
+        temporal_type: str = "transformer",
+        temporal_layers: int = 1,
+        num_cue_tokens: int = 8,
+        selector_layers: int = 1,
+        selector_type: str = "query_attention",
+        tokenlearner_pooling: str = "sigmoid",
+        memory_type: str = "attention",
+        use_spatial_graph: bool = False,
+        spatial_graph_neighbors: int = 8,
+        spatial_relation_type: str | None = None,
+        use_temporal_difference_conv: bool = False,
+        use_temporal_shift: bool = False,
+        decoder_layers: int = 1,
+        decoder_type: str = "horizon_query_decoder",
+        cue_temporal_layers: int = 1,
+        dropout: float = 0.1,
+        use_constant_velocity_residual: bool = True,
+        residual_scale: float = 1.0,
+        num_modes: int = 1,
+        long_memory_type: str = "gated_attention",
+        long_memory_slots: int | None = None,
+        long_memory_use_ego: bool = True,
+        detach_long_memory: bool = True,
+    ) -> None:
+        super().__init__()
+        self.short_model = TwoStreamEgocentricCueMemoryPathPredictor(
+            future_steps=future_steps,
+            backbone_name=backbone_name,
+            hidden_dim=hidden_dim,
+            freeze_backbone=freeze_backbone,
+            use_bottleneck_adapters=use_bottleneck_adapters,
+            adapter_bottleneck_dim=adapter_bottleneck_dim,
+            temporal_type=temporal_type,
+            temporal_layers=temporal_layers,
+            num_cue_tokens=num_cue_tokens,
+            selector_layers=selector_layers,
+            selector_type=selector_type,
+            tokenlearner_pooling=tokenlearner_pooling,
+            memory_type=memory_type,
+            use_spatial_graph=use_spatial_graph,
+            spatial_graph_neighbors=spatial_graph_neighbors,
+            spatial_relation_type=spatial_relation_type,
+            use_temporal_difference_conv=use_temporal_difference_conv,
+            use_temporal_shift=use_temporal_shift,
+            decoder_layers=decoder_layers,
+            decoder_type=decoder_type,
+            cue_temporal_layers=cue_temporal_layers,
+            dropout=dropout,
+            use_constant_velocity_residual=use_constant_velocity_residual,
+            residual_scale=residual_scale,
+            num_modes=num_modes,
+        )
+        self.long_memory_type = long_memory_type.lower()
+        self.long_memory_slots = int(long_memory_slots or num_cue_tokens)
+        self.detach_long_memory = detach_long_memory
+        if self.long_memory_type == "none":
+            self.long_memory_bank = None
+        elif self.long_memory_type in {"mean", "mean_memory", "running_mean"}:
+            if self.long_memory_slots != num_cue_tokens:
+                raise ValueError("mean long memory requires long_memory_slots == num_cue_tokens")
+            self.long_memory_bank = None
+        else:
+            self.long_memory_bank = EpisodicCueLongMemoryBank(
+                hidden_dim,
+                self.long_memory_slots,
+                dropout=dropout,
+                use_ego=long_memory_use_ego,
+                memory_type=self.long_memory_type,
+            )
+
+    @property
+    def future_steps(self) -> int:
+        return self.short_model.future_steps
+
+    def _slice_window_batch(
+        self,
+        batch: dict[str, torch.Tensor],
+        index: int,
+    ) -> dict[str, torch.Tensor]:
+        window: dict[str, torch.Tensor] = {
+            "ego_history": batch["ego_history"][:, index, :, :],
+        }
+        if "visual_tokens" in batch:
+            window["visual_tokens"] = batch["visual_tokens"][:, index, :, :, :]
+        if "rgb_history" in batch:
+            window["rgb_history"] = batch["rgb_history"][:, index, :, :, :, :]
+        return window
+
+    def _initial_long_memory(
+        self,
+        short_memory: torch.Tensor,
+    ) -> torch.Tensor:
+        batch_size = short_memory.shape[0]
+        if self.long_memory_bank is not None:
+            return self.long_memory_bank.initial_state(batch_size, short_memory.device, short_memory.dtype)
+        return short_memory.new_zeros(batch_size, self.long_memory_slots, short_memory.shape[-1])
+
+    @staticmethod
+    def _append_prediction(
+        outputs: list[torch.Tensor] | dict[str, list[torch.Tensor]],
+        pred: torch.Tensor | dict[str, torch.Tensor],
+    ) -> list[torch.Tensor] | dict[str, list[torch.Tensor]]:
+        if isinstance(pred, dict):
+            if not isinstance(outputs, dict):
+                outputs = {"paths": [], "logits": []}
+            outputs["paths"].append(pred["paths"])
+            outputs["logits"].append(pred["logits"])
+            return outputs
+        if isinstance(outputs, dict):
+            raise RuntimeError("Cannot mix tensor and dict episodic predictions")
+        outputs.append(pred)
+        return outputs
+
+    @staticmethod
+    def _stack_predictions(
+        outputs: list[torch.Tensor] | dict[str, list[torch.Tensor]],
+    ) -> torch.Tensor | dict[str, torch.Tensor]:
+        if isinstance(outputs, dict):
+            return {
+                "paths": torch.stack(outputs["paths"], dim=1),
+                "logits": torch.stack(outputs["logits"], dim=1),
+            }
+        return torch.stack(outputs, dim=1)
+
+    def _update_long_memory(
+        self,
+        long_memory: torch.Tensor,
+        short_memory: torch.Tensor,
+        ego_history: torch.Tensor,
+        step: int,
+    ) -> torch.Tensor:
+        if self.long_memory_type == "none":
+            return long_memory
+        if self.long_memory_type in {"mean", "mean_memory", "running_mean"}:
+            if step == 0:
+                updated = short_memory
+            else:
+                updated = (long_memory * step + short_memory) / float(step + 1)
+            return updated.detach() if self.detach_long_memory else updated
+        if self.long_memory_bank is None:
+            raise RuntimeError("long_memory_bank is required for learned episodic memory")
+        updated = self.long_memory_bank(long_memory, short_memory, ego_history)
+        return updated.detach() if self.detach_long_memory else updated
+
+    def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor | dict[str, torch.Tensor]:
+        # chunk tensors: [B, L, ...]
+        chunk_length = batch["ego_history"].shape[1]
+        outputs: list[torch.Tensor] | dict[str, list[torch.Tensor]] = []
+        long_memory: torch.Tensor | None = None
+        for step in range(chunk_length):
+            window = self._slice_window_batch(batch, step)
+            short_memory = self.short_model.encode_memory(window)
+            if long_memory is None:
+                long_memory = self._initial_long_memory(short_memory)
+            read_memory = short_memory if self.long_memory_type == "none" else torch.cat([short_memory, long_memory], dim=1)
+            pred = self.short_model.decode_memory(read_memory, window["ego_history"])
+            outputs = self._append_prediction(outputs, pred)
+            long_memory = self._update_long_memory(long_memory, short_memory, window["ego_history"], step)
+        return self._stack_predictions(outputs)

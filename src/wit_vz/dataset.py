@@ -187,11 +187,136 @@ class WITVZPathDataset(Dataset):
         return item
 
 
+class WITVZEpisodicChunkDataset(Dataset):
+    """Sequence dataset that keeps sample order within each episode.
+
+    Each item is a fixed-length chunk of consecutive WIT-VZ samples from one
+    episode. It is intended for stateful/episodic models where memory must carry
+    across adjacent 1-second prediction windows.
+    """
+
+    def __init__(
+        self,
+        dataset_dir: str | Path,
+        split: str = "train",
+        image_size: int | tuple[int, int] = 64,
+        load_rgb: bool = True,
+        visual_feature_cache_dir: str | Path | None = None,
+        history_frame_mode: str = "full",
+        frame_order: str = "normal",
+        chunk_length: int = 16,
+        chunk_stride: int = 1,
+        include_tail: bool = True,
+    ) -> None:
+        if chunk_length <= 0:
+            raise ValueError("chunk_length must be positive")
+        if chunk_stride <= 0:
+            raise ValueError("chunk_stride must be positive")
+        self.base = WITVZPathDataset(
+            dataset_dir,
+            split=split,
+            image_size=image_size,
+            load_rgb=load_rgb,
+            visual_feature_cache_dir=visual_feature_cache_dir,
+            history_frame_mode=history_frame_mode,
+            frame_order=frame_order,
+        )
+        self.dataset_dir = self.base.dataset_dir
+        self.manifest = self.base.manifest
+        self.chunk_length = chunk_length
+        self.chunk_stride = chunk_stride
+        self.include_tail = include_tail
+
+        by_episode: dict[str, list[int]] = {}
+        for index, sample in enumerate(self.base.samples):
+            by_episode.setdefault(str(sample["episode_id"]), []).append(index)
+        for indices in by_episode.values():
+            indices.sort(key=lambda idx: int(self.base.samples[idx].get("center_step", 0)))
+
+        self.chunks: list[list[int]] = []
+        for indices in by_episode.values():
+            if len(indices) < chunk_length:
+                continue
+            starts = list(range(0, len(indices) - chunk_length + 1, chunk_stride))
+            if include_tail:
+                tail_start = len(indices) - chunk_length
+                if starts and starts[-1] != tail_start:
+                    starts.append(tail_start)
+                elif not starts:
+                    starts = [tail_start]
+            for start in starts:
+                self.chunks.append(indices[start : start + chunk_length])
+        if not self.chunks:
+            raise ValueError(
+                f"No episodic chunks found for split={split} in {dataset_dir}; "
+                f"chunk_length={chunk_length}, stride={chunk_stride}"
+            )
+
+    @property
+    def samples(self) -> list[dict[str, Any]]:
+        return self.base.samples
+
+    def __len__(self) -> int:
+        return len(self.chunks)
+
+    def chunk_balance_sample(self, chunk_index: int, burn_in: int = 0) -> dict[str, Any]:
+        chunk = self.chunks[chunk_index]
+        selected = chunk[min(max(burn_in, 0), len(chunk) - 1)]
+        return self.base.samples[selected]
+
+    def __getitem__(self, index: int) -> dict[str, Any]:
+        items = [self.base[base_index] for base_index in self.chunks[index]]
+        return {
+            "chunk_id": f"{items[0]['episode_id']}::{items[0]['center_step']}:{items[-1]['center_step']}",
+            "sample_id": [item["sample_id"] for item in items],
+            "episode_id": items[0]["episode_id"],
+            "center_step": torch.tensor([item["center_step"] for item in items], dtype=torch.long),
+            "ego_history": torch.stack([item["ego_history"] for item in items], dim=0),
+            "future_path": torch.stack([item["future_path"] for item in items], dim=0),
+            "metadata": [item["metadata"] for item in items],
+            "source": [item["source"] for item in items],
+            "balance": [item["balance"] for item in items],
+            "current_pose": [item["current_pose"] for item in items],
+            "rgb_history_paths": [item["rgb_history_paths"] for item in items],
+            **(
+                {"rgb_history": torch.stack([item["rgb_history"] for item in items], dim=0)}
+                if "rgb_history" in items[0]
+                else {}
+            ),
+            **(
+                {"visual_tokens": torch.stack([item["visual_tokens"] for item in items], dim=0)}
+                if "visual_tokens" in items[0]
+                else {}
+            ),
+        }
+
+
 def collate_path_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
     output: dict[str, Any] = {
         "sample_id": [item["sample_id"] for item in batch],
         "episode_id": [item["episode_id"] for item in batch],
         "center_step": torch.tensor([item["center_step"] for item in batch], dtype=torch.long),
+        "ego_history": torch.stack([item["ego_history"] for item in batch], dim=0),
+        "future_path": torch.stack([item["future_path"] for item in batch], dim=0),
+        "metadata": [item["metadata"] for item in batch],
+        "source": [item["source"] for item in batch],
+        "balance": [item["balance"] for item in batch],
+        "current_pose": [item["current_pose"] for item in batch],
+        "rgb_history_paths": [item["rgb_history_paths"] for item in batch],
+    }
+    if "rgb_history" in batch[0]:
+        output["rgb_history"] = torch.stack([item["rgb_history"] for item in batch], dim=0)
+    if "visual_tokens" in batch[0]:
+        output["visual_tokens"] = torch.stack([item["visual_tokens"] for item in batch], dim=0)
+    return output
+
+
+def collate_episodic_path_batch(batch: list[dict[str, Any]]) -> dict[str, Any]:
+    output: dict[str, Any] = {
+        "chunk_id": [item["chunk_id"] for item in batch],
+        "sample_id": [item["sample_id"] for item in batch],
+        "episode_id": [item["episode_id"] for item in batch],
+        "center_step": torch.stack([item["center_step"] for item in batch], dim=0),
         "ego_history": torch.stack([item["ego_history"] for item in batch], dim=0),
         "future_path": torch.stack([item["future_path"] for item in batch], dim=0),
         "metadata": [item["metadata"] for item in batch],

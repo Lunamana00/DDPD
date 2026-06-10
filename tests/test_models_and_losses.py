@@ -4,6 +4,7 @@ from src.losses import trajectory_loss
 from src.metrics import ade, fde, select_best_trajectory
 from src.models.baselines import ConstantVelocityBaseline, EgoMotionOnlyModel
 from src.models.cue_memory import (
+    EpisodicLongTermCueMemoryPathPredictor,
     LastCueMemoryBank,
     MeanCueMemoryBank,
     RelativeContrastHybridSpatialGraphAggregator,
@@ -18,6 +19,14 @@ def make_batch(batch=2, history=4, future=3):
         "rgb_history": torch.rand(batch, history, 3, 32, 32),
         "ego_history": torch.rand(batch, history, 3),
         "future_path": torch.rand(batch, future, 2),
+    }
+
+
+def make_episodic_batch(batch=2, chunk=3, history=4, future=3):
+    return {
+        "rgb_history": torch.rand(batch, chunk, history, 3, 32, 32),
+        "ego_history": torch.rand(batch, chunk, history, 3),
+        "future_path": torch.rand(batch, chunk, future, 2),
     }
 
 
@@ -217,6 +226,42 @@ def test_cue_memory_bank_ablation_variants_forward_shape():
         )
         out = model(batch)
         assert out.shape == (2, 3, 2)
+
+
+def test_episodic_long_memory_forward_shape():
+    batch = make_episodic_batch(batch=2, chunk=3, history=4, future=3)
+    model = EpisodicLongTermCueMemoryPathPredictor(
+        future_steps=3,
+        backbone_name="small_cnn",
+        hidden_dim=32,
+        num_cue_tokens=4,
+        temporal_type="gru",
+        freeze_backbone=False,
+        memory_type="attention",
+        long_memory_type="gated_attention",
+        long_memory_slots=4,
+    )
+    out = model(batch)
+    assert out.shape == (2, 3, 3, 2)
+
+
+def test_episodic_long_memory_variants_forward_shape():
+    batch = make_episodic_batch(batch=2, chunk=3, history=4, future=3)
+    for long_memory_type in ("none", "mean", "attention", "gated_attention", "gated_forget"):
+        model = EpisodicLongTermCueMemoryPathPredictor(
+            future_steps=3,
+            backbone_name="small_cnn",
+            hidden_dim=32,
+            num_cue_tokens=4,
+            temporal_type="none",
+            freeze_backbone=False,
+            memory_type="attention",
+            selector_type="tokenlearner",
+            long_memory_type=long_memory_type,
+            long_memory_slots=4,
+        )
+        out = model(batch)
+        assert out.shape == (2, 3, 3, 2)
 
 
 def test_cue_memory_decoder_ablation_variants_forward_shape():

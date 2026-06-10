@@ -86,6 +86,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--max-gpu-util-percent", type=int, default=10)
     parser.add_argument("--poll-seconds", type=int, default=60)
     parser.add_argument("--epochs", type=int, default=80)
+    parser.add_argument("--early-stopping-patience", type=int, default=12)
+    parser.add_argument("--lr-scheduler-patience", type=int, default=6)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--single-batch-size", type=int, default=512)
     parser.add_argument("--chunk-length", type=int, default=16)
@@ -130,8 +132,9 @@ def base_config(args: argparse.Namespace, task: Task) -> dict[str, Any]:
         "weight_decay": 0.001,
         "dropout": 0.2,
         "grad_clip_norm": 1.0,
-        "early_stopping_patience": args.epochs,
-        "lr_scheduler_patience": 25,
+        "early_stopping_patience": args.early_stopping_patience,
+        "early_stopping_min_delta": 0.0,
+        "lr_scheduler_patience": args.lr_scheduler_patience,
         "lr_scheduler_factor": 0.5,
         "min_lr": 0.000001,
         "hidden_dim": 128,

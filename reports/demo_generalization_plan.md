@@ -327,11 +327,57 @@ ADE 44.765 / FDE 74.896, while constant velocity is ADE 0.571 / FDE 1.080.
 This is a photorealistic domain-shift limitation demo.
 ```
 
-### 2.6 Later Candidates
+### 2.6 MineDojo
+
+Role:
+
+```text
+Minecraft-style sandbox first-person domain.
+Useful for checking whether the WIT-VZ schema can use a very different game
+visual style while still obtaining privileged pose labels for evaluation.
+```
+
+Collector:
+
+```text
+scripts/collect_minedojo_wit_vz.py
+```
+
+Execution note:
+
+```text
+MineDojo was installed in a user-space micromamba env with Java 8:
+/home/taehyun/projects/minedojo_env
+
+Compatibility fixes were needed:
+- pip/setuptools/wheel were pinned for gym==0.21.0 metadata compatibility.
+- numpy was pinned to <2 because MineDojo uses removed np.unicode_ aliases.
+- the old Malmo Gradle dependency com.github.SpongePowered:MixinGradle:dcfaf61
+  was provided through a local Maven cache because the original remote artifact
+  no longer resolved reliably.
+
+One plains episode was collected. Additional biome launches were too slow on
+the shared server, so this should be treated as a formulation gate and failure
+case, not as a broad Minecraft evaluation.
+```
+
+Current demo result:
+
+```text
+reports/demo/external_minedojo_zero_shot_03s/
+
+MineDojo zero-shot was run on 31 samples from one plains episode.
+The pipeline runs with RGB and privileged pose labels, but the ViZDoom
+checkpoint fails badly while constant velocity remains strong:
+ADE 89.338 / FDE 161.605, while constant velocity is ADE 0.447 / FDE 0.837.
+This is a Minecraft-style domain-gap failure demo.
+```
+
+### 2.7 Later Candidates
 
 | Candidate | Use | Risk |
 |---|---|---|
-| MineRL / MineDojo | Minecraft game data and human demonstrations. | Requires Java/headless setup and reliable pose-to-local-path conversion. |
+| MineRL human demonstrations | Minecraft human trajectories / videos. | Standard MineRL observations may not expose pose labels needed for ADE/FDE without extra instrumentation. |
 | WorldCam-50h | Real gameplay video + camera pose. | Dataset-style extension, not a quick playable simulator demo. |
 
 ## 3. Recommended Demo Package
@@ -347,14 +393,14 @@ Use this order for presentation:
 6. ProcTHOR external zero-shot: procedural Unity-house limitation demo.
 7. DeepMind Lab external zero-shot: small game-like positive sanity demo.
 8. Habitat-Sim external zero-shot: photorealistic embodied-navigation failure demo.
-9. MineRL / MineDojo: future expansion candidates with gates documented in reports/demo_external_execution_gates.md.
+9. MineDojo external zero-shot: Minecraft-style formulation gate and domain-gap failure demo.
 ```
 
 Claim boundary:
 
 ```text
 ViZDoom multi-scenario results support in-domain scenario diversity.
-MiniWorld/AI2-THOR/ProcTHOR/DeepMind Lab/Habitat-Sim results support external formulation
+MiniWorld/AI2-THOR/ProcTHOR/DeepMind Lab/Habitat-Sim/MineDojo results support external formulation
 transfer and domain-shift analysis. DMLab is currently the only small external
 demo where the zero-shot checkpoint beats CV, but it should not be oversold as
 proven broad game generalization unless retrained and evaluated with matched splits.
@@ -369,3 +415,4 @@ proven broad game generalization unless retrained and evaluated with matched spl
 | ProcTHOR | https://procthor.allenai.org/ | Procedurally generated AI2-THOR houses for larger domain variation. |
 | DeepMind Lab | https://github.com/google-deepmind/lab | Game-like first-person 3D navigation and puzzle-solving testbed. |
 | Habitat | https://aihabitat.org/ | Photorealistic embodied AI simulator; useful as a later robotics-style domain shift. |
+| MineDojo | https://docs.minedojo.org/ | Minecraft-style first-person environment with RGB and privileged location stats. |

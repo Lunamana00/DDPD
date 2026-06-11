@@ -16,13 +16,15 @@ Use this folder as the shortest live-demo path for slides or screen sharing.
 | 8 | `08_procthor_external_overview.png` | Procedural Unity-house check: source ProcTHOR runs through the same WIT-VZ path, and again exposes zero-shot domain shift. |
 | 9 | `09_deepmind_lab_external_overview.png` | Game-like external-domain check: DeepMind Lab runs through the same WIT-VZ path; unlike the simple random-walk external domains, visual prediction improves over CV on this small demo. |
 | 10 | `10_habitat_external_overview.png` | Photorealistic embodied-navigation check: Habitat-Sim runs through the same WIT-VZ path, but the ViZDoom checkpoint fails strongly under scale and visual-domain shift. |
+| 11 | `11_minedojo_external_overview.png` | Minecraft-style sandbox check: MineDojo exposes RGB and privileged pose, so the WIT-VZ formulation runs, but the zero-shot ViZDoom checkpoint fails badly while CV remains strong on the smooth plains rollout. |
 
 ## Claim Boundary
 
 The ViZDoom examples support in-domain scenario diversity, not broad game
-generalization. The MiniWorld, AI2-THOR, ProcTHOR, DeepMind Lab, and Habitat examples support
+generalization. The MiniWorld, AI2-THOR, ProcTHOR, DeepMind Lab, Habitat, and MineDojo examples support
 formulation transfer and expose domain shift: the pipeline can run outside
 ViZDoom, but the ViZDoom-trained checkpoint is not calibrated for different
 dynamics, visual style, or coordinate scale. DeepMind Lab is the current
 positive external sanity case, but it is still a small demo rather than a broad
-generalization proof.
+generalization proof. MineDojo should be presented as a formulation/labeling
+gate and a domain-gap failure case, not as evidence of Minecraft generalization.

@@ -1,8 +1,8 @@
 # External Demo Execution Gates
 
 This report records the current execution state of the external demo candidates
-after the completed MiniWorld, AI2-THOR, ProcTHOR, DeepMind Lab, and
-Habitat-Sim zero-shot demos.
+after the completed MiniWorld, AI2-THOR, ProcTHOR, DeepMind Lab, Habitat-Sim,
+and MineDojo zero-shot demos.
 
 ## Current Status
 
@@ -13,7 +13,8 @@ Habitat-Sim zero-shot demos.
 | ProcTHOR | Completed with source checkout | `reports/demo/external_procthor_zero_shot_03s/` | Use as a procedural Unity-house domain-shift failure demo. |
 | DeepMind Lab | Completed with source build | `reports/demo/external_deepmind_lab_zero_shot_03s/` | Use as the small game-like external-domain positive sanity case. |
 | Habitat-Sim | Completed with micromamba env | `reports/demo/external_habitat_zero_shot_03s/` | Use as the photorealistic embodied-navigation domain-shift failure demo. |
-| MineRL / MineDojo | Environment gate not satisfied | `minerl` and `minedojo` exist on PyPI, but Java is absent on `gpuserver3090`; WIT-VZ pose conversion is not direct. | Keep as future Minecraft-style extension. |
+| MineDojo | Completed with micromamba env and Malmo dependency patch | `reports/demo/external_minedojo_zero_shot_03s/` | Use as a Minecraft-style formulation gate and domain-shift failure demo. |
+| MineRL human/demo data | Not executed | Standard MineRL observations still need a reliable pose-label route for ADE/FDE. | Keep as future dataset-style extension. |
 
 ## Server State
 
@@ -28,8 +29,8 @@ shapely==2.1.2
 python-fcl==0.7.0.11
 scipy==1.15.3
 moviepy==1.0.3
-minerl: not-installed
-minedojo: not-installed
+minerl: not-installed in the DDPD venv
+minedojo: installed in /home/taehyun/projects/minedojo_env
 habitat-sim: installed in /home/taehyun/projects/habitat_env
 deepmind_lab: installed in separate /home/taehyun/projects/dmlab_env
 ```
@@ -41,7 +42,7 @@ xvfb-run: available
 git/gcc/g++: available
 bazel: installed user-space through Bazelisk at ~/bin/bazel
 micromamba: installed user-space at ~/bin/micromamba
-java: missing
+java: available in /home/taehyun/projects/minedojo_env through openjdk 8.0.472
 home disk: 624G free
 AI2-THOR release cache: 3.1G
 ```
@@ -235,7 +236,7 @@ ADE/FDE: 44.765 / 74.896
 CV ADE/FDE: 0.571 / 1.080
 ```
 
-## MineRL / MineDojo Gate
+## MineDojo Completed Demo
 
 Why it is still useful:
 
@@ -244,30 +245,62 @@ Minecraft is game-like and visually very different from ViZDoom. It would be a
 strong stress test for broad visual-domain generalization.
 ```
 
-Current blocker:
+Environment route:
 
 ```text
-minerl and minedojo are available on PyPI.
-java is missing on gpuserver3090.
-xvfb-run is available.
+micromamba env: /home/taehyun/projects/minedojo_env
+Python: 3.9
+Java: OpenJDK 8.0.472
+package: minedojo 0.1
+headless wrapper: xvfb-run
 ```
 
-Additional modeling issue:
+Compatibility fixes:
 
 ```text
-MineRL/MineDojo expose first-person RGB observations, but ADE/FDE evaluation
-requires local future path labels. The conversion is not just video playback:
-we need reliable agent position/yaw or action-to-pose integration to produce
-[forward, right] future waypoints.
+1. gym==0.21.0 required older pip/setuptools/wheel behavior.
+2. MineDojo required numpy<2 because it still references removed NumPy aliases.
+3. Malmo's Gradle dependency com.github.SpongePowered:MixinGradle:dcfaf61 no
+   longer resolved from the original remote repositories, so the jar from
+   github.com/verityw/MixinGradle-dcfaf61 was installed into the local Maven
+   cache and buildscript repositories were patched with mavenLocal().
 ```
 
-Required route:
+Pose-label result:
 
 ```text
-1. Install Java/JDK and MineRL or MineDojo in a separate environment.
-2. Run under xvfb-run for headless rendering.
-3. Verify RGB observation and agent position/yaw availability.
-4. Implement WIT-VZ raw export only if pose is reliable.
+MineDojo reset/step exposes:
+- rgb: [3, H, W]
+- location_stats.pos: [x, y, z]
+- location_stats.yaw / pitch
+
+The collector converts Minecraft coordinates to WIT-VZ coordinates with:
+world-x := minecraft z
+world-y := minecraft x
+angle := -minecraft yaw
+```
+
+Completed WIT-VZ run:
+
+```text
+collector: scripts/collect_minedojo_wit_vz.py
+raw: data/wit_vz/raw/minedojo_demo_001
+processed: data/wit_vz/processed/minedojo_demo_001_03s
+biome: plains
+episodes: 1
+frames: 50
+samples: 31
+zero-shot output: reports/demo/external_minedojo_zero_shot_03s/
+ADE/FDE: 89.338 / 161.605
+CV ADE/FDE: 0.447 / 0.837
+```
+
+Limitation:
+
+```text
+Additional biome launches were too slow on the shared server, so this is a
+small formulation gate and a domain-gap failure case. It should not be
+presented as Minecraft generalization.
 ```
 
 ## Presentation Recommendation
@@ -283,14 +316,16 @@ Use completed demos only:
 6. ProcTHOR external zero-shot failure.
 7. DeepMind Lab external zero-shot positive sanity case.
 8. Habitat-Sim external zero-shot failure.
+9. MineDojo external zero-shot formulation gate and failure.
 ```
 
 Mention the remaining candidates as future work:
 
 ```text
 ProcTHOR, DeepMind Lab, and Habitat are now completed with source-checkout,
-source-build, or micromamba routes. MineRL/MineDojo still needs a separate
-Minecraft/Java environment and pose-conversion verification.
+source-build, or micromamba routes. MineDojo is also completed as a small
+Minecraft-style gate. MineRL human/demo data remains future work because
+ADE/FDE requires reliable pose labels, not RGB video alone.
 ```
 
 ## Source Pointers

@@ -290,12 +290,48 @@ ADE 155.288 / FDE 239.752, while constant velocity is ADE 180.822 / FDE 306.231.
 This is a small positive external-domain sanity demo, not broad generalization proof.
 ```
 
-### 2.5 Later Candidates
+### 2.5 Habitat-Sim
+
+Role:
+
+```text
+Photorealistic embodied-navigation domain.
+This is less game-like than ViZDoom or DeepMind Lab, but useful for testing
+whether the same RGB-history + ego-motion -> local future path formulation can
+run on realistic indoor scenes with true agent pose.
+```
+
+Collector:
+
+```text
+scripts/collect_habitat_wit_vz.py
+```
+
+Execution note:
+
+```text
+Habitat-Sim was installed in a user-space micromamba env:
+/home/taehyun/projects/habitat_env
+package: habitat-sim 0.3.3 headless, Python 3.9
+test scene: habitat-test-scenes/skokloster-castle.glb
+```
+
+Current demo result:
+
+```text
+reports/demo/external_habitat_zero_shot_03s/
+
+Habitat-Sim zero-shot was run on 124 samples from the skokloster-castle test scene.
+The pipeline runs, but the ViZDoom checkpoint fails to generalize:
+ADE 44.765 / FDE 74.896, while constant velocity is ADE 0.571 / FDE 1.080.
+This is a photorealistic domain-shift limitation demo.
+```
+
+### 2.6 Later Candidates
 
 | Candidate | Use | Risk |
 |---|---|---|
 | MineRL / MineDojo | Minecraft game data and human demonstrations. | Requires Java/headless setup and reliable pose-to-local-path conversion. |
-| Habitat-Sim | Photorealistic indoor navigation. | Requires conda/mamba or container install; more robotics than game. |
 | WorldCam-50h | Real gameplay video + camera pose. | Dataset-style extension, not a quick playable simulator demo. |
 
 ## 3. Recommended Demo Package
@@ -310,14 +346,15 @@ Use this order for presentation:
 5. AI2-THOR external zero-shot: object-rich Unity-domain limitation demo.
 6. ProcTHOR external zero-shot: procedural Unity-house limitation demo.
 7. DeepMind Lab external zero-shot: small game-like positive sanity demo.
-8. MineRL / Habitat: future expansion candidates with gates documented in reports/demo_external_execution_gates.md.
+8. Habitat-Sim external zero-shot: photorealistic embodied-navigation failure demo.
+9. MineRL / MineDojo: future expansion candidates with gates documented in reports/demo_external_execution_gates.md.
 ```
 
 Claim boundary:
 
 ```text
 ViZDoom multi-scenario results support in-domain scenario diversity.
-MiniWorld/AI2-THOR/ProcTHOR/DeepMind Lab results support external formulation
+MiniWorld/AI2-THOR/ProcTHOR/DeepMind Lab/Habitat-Sim results support external formulation
 transfer and domain-shift analysis. DMLab is currently the only small external
 demo where the zero-shot checkpoint beats CV, but it should not be oversold as
 proven broad game generalization unless retrained and evaluated with matched splits.

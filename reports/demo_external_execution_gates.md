@@ -1,8 +1,8 @@
 # External Demo Execution Gates
 
 This report records the current execution state of the external demo candidates
-after the completed MiniWorld, AI2-THOR, ProcTHOR, and DeepMind Lab zero-shot
-demos.
+after the completed MiniWorld, AI2-THOR, ProcTHOR, DeepMind Lab, and
+Habitat-Sim zero-shot demos.
 
 ## Current Status
 
@@ -12,7 +12,7 @@ demos.
 | AI2-THOR | Completed | `reports/demo/external_ai2thor_zero_shot_03s/` | Use as the object-rich Unity-domain failure/sanity demo. |
 | ProcTHOR | Completed with source checkout | `reports/demo/external_procthor_zero_shot_03s/` | Use as a procedural Unity-house domain-shift failure demo. |
 | DeepMind Lab | Completed with source build | `reports/demo/external_deepmind_lab_zero_shot_03s/` | Use as the small game-like external-domain positive sanity case. |
-| Habitat-Sim | Environment gate not satisfied | No `habitat-sim` pip candidate in this venv check; no conda/mamba installed on `gpuserver3090`. | Keep as future robotics/photorealistic extension. |
+| Habitat-Sim | Completed with micromamba env | `reports/demo/external_habitat_zero_shot_03s/` | Use as the photorealistic embodied-navigation domain-shift failure demo. |
 | MineRL / MineDojo | Environment gate not satisfied | `minerl` and `minedojo` exist on PyPI, but Java is absent on `gpuserver3090`; WIT-VZ pose conversion is not direct. | Keep as future Minecraft-style extension. |
 
 ## Server State
@@ -30,7 +30,7 @@ scipy==1.15.3
 moviepy==1.0.3
 minerl: not-installed
 minedojo: not-installed
-habitat-sim: not-installed
+habitat-sim: installed in /home/taehyun/projects/habitat_env
 deepmind_lab: installed in separate /home/taehyun/projects/dmlab_env
 ```
 
@@ -40,7 +40,7 @@ System tools:
 xvfb-run: available
 git/gcc/g++: available
 bazel: installed user-space through Bazelisk at ~/bin/bazel
-conda/mamba: missing
+micromamba: installed user-space at ~/bin/micromamba
 java: missing
 home disk: 624G free
 AI2-THOR release cache: 3.1G
@@ -194,7 +194,7 @@ ADE/FDE: 155.288 / 239.752
 CV ADE/FDE: 180.822 / 306.231
 ```
 
-## Habitat-Sim Gate
+## Habitat-Sim Completed Demo
 
 Why it is still useful:
 
@@ -203,21 +203,36 @@ Habitat is less game-like, but it is a strong photorealistic embodied-navigation
 domain-shift candidate with RGB, agent pose, and standard trajectory APIs.
 ```
 
-Current blocker:
+Environment route:
 
 ```text
-conda/mamba: missing on gpuserver3090
-habitat-sim: no direct pip candidate in the current venv check
+micromamba env: /home/taehyun/projects/habitat_env
+package: habitat-sim 0.3.3, headless, Python 3.9
+test data: habitat_test_scenes downloaded to /home/taehyun/projects/habitat_data
+scene: skokloster-castle.glb
 ```
 
-Required route:
+Smoke-test result:
 
 ```text
-1. Install mamba/conda or use a container.
-2. Install habitat-sim headless from conda-forge/aihabitat.
-3. Download habitat_test_scenes.
-4. Run a scripted agent and export RGB frames plus agent state.
-5. Convert to WIT-VZ raw schema.
+RGB observation shape: [120, 160, 4]
+agent state position: available
+agent state rotation: available
+step(move_forward): success
+```
+
+Completed WIT-VZ run:
+
+```text
+collector: scripts/collect_habitat_wit_vz.py
+raw: data/wit_vz/raw/habitat_demo_001
+processed: data/wit_vz/processed/habitat_demo_001_03s
+episodes: 4
+frames: 200
+samples: 124
+zero-shot output: reports/demo/external_habitat_zero_shot_03s/
+ADE/FDE: 44.765 / 74.896
+CV ADE/FDE: 0.571 / 1.080
 ```
 
 ## MineRL / MineDojo Gate
@@ -267,14 +282,15 @@ Use completed demos only:
 5. AI2-THOR external zero-shot failure.
 6. ProcTHOR external zero-shot failure.
 7. DeepMind Lab external zero-shot positive sanity case.
+8. Habitat-Sim external zero-shot failure.
 ```
 
 Mention the remaining candidates as future work:
 
 ```text
-ProcTHOR and DeepMind Lab are now completed with source-checkout/build routes.
-Habitat and MineRL/MineDojo need separate simulator environments before they
-can become fair WIT-VZ demos.
+ProcTHOR, DeepMind Lab, and Habitat are now completed with source-checkout,
+source-build, or micromamba routes. MineRL/MineDojo still needs a separate
+Minecraft/Java environment and pose-conversion verification.
 ```
 
 ## Source Pointers

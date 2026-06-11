@@ -10,7 +10,7 @@ This report tracks what has actually been run outside ViZDoom.
 | AI2-THOR | Completed | `reports/demo/external_ai2thor_zero_shot_03s/` | The WIT-VZ schema also runs on object-rich Unity indoor scenes, but the ViZDoom checkpoint fails under this domain shift. |
 | ProcTHOR | Completed with source checkout | `reports/demo/external_procthor_zero_shot_03s/` | Source ProcTHOR runs through the same WIT-VZ path; the ViZDoom checkpoint fails even more strongly under procedural-house domain shift. |
 | DeepMind Lab | Completed with source build | `reports/demo/external_deepmind_lab_zero_shot_03s/` | Source DeepMind Lab runs through the same WIT-VZ path; on this small game-like demo the model improves over CV, but the result is not yet a broad generalization claim. |
-| Habitat | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Useful robotics-style domain shift, but current server lacks conda/mamba and `habitat-sim`. |
+| Habitat-Sim | Completed with micromamba env | `reports/demo/external_habitat_zero_shot_03s/` | The WIT-VZ schema runs on a photorealistic test scene, but the ViZDoom checkpoint fails strongly under this domain and scale shift. |
 | MineRL / MineDojo | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Game-like, but current server lacks Java and pose-to-WIT-VZ conversion must be verified. |
 
 ## MiniWorld Zero-Shot Demo
@@ -351,6 +351,77 @@ residual can transfer to another game-like domain in some cases", not as proof
 of broad zero-shot game generalization.
 ```
 
+## Habitat-Sim Zero-Shot Demo
+
+Habitat-Sim was installed through the official conda-style route using a
+user-space micromamba environment:
+
+```text
+env: /home/taehyun/projects/habitat_env
+package: habitat-sim 0.3.3, headless, Python 3.9
+test scene: habitat_test_scenes/skokloster-castle.glb
+```
+
+Data collection:
+
+```bash
+python scripts/collect_habitat_wit_vz.py \
+  --out-root data/wit_vz/raw \
+  --run-id habitat_demo_001 \
+  --scene /home/taehyun/projects/habitat_data/scene_datasets/habitat-test-scenes/skokloster-castle.glb \
+  --episodes 4 \
+  --max-steps 50 \
+  --fps 5 \
+  --width 160 \
+  --height 120 \
+  --seed 1301 \
+  --overwrite
+```
+
+Processed WIT-VZ samples:
+
+```text
+dataset: data/wit_vz/processed/habitat_demo_001_03s
+scene: skokloster-castle
+episodes: 4
+frames: 200
+samples: 124
+history: 1s, 5 frames
+future: 3s, 15 waypoints
+split: episode-disjoint
+```
+
+Result on all Habitat demo samples:
+
+| Model | ADE | FDE |
+|---|---:|---:|
+| ViZDoom-trained DINOv3 cue-memory checkpoint, zero-shot Habitat | 44.765 | 74.896 |
+| Constant-velocity baseline | 0.571 | 1.080 |
+
+Hard-CV subset:
+
+| Model | ADE | FDE |
+|---|---:|---:|
+| ViZDoom-trained checkpoint | 46.534 | 78.605 |
+| Constant-velocity baseline | 0.975 | 1.865 |
+
+Visualization:
+
+```text
+reports/demo/external_habitat_zero_shot_03s/contact_by_scene/contact_sheet.png
+reports/demo/presentation_sequence/10_habitat_external_overview.png
+```
+
+Interpretation:
+
+```text
+Habitat-Sim confirms that the WIT-VZ schema can be applied to photorealistic
+embodied-navigation data with real agent pose. The checkpoint itself does not
+generalize: trajectories are locally simple and coordinate scale is very
+different from ViZDoom, so constant velocity remains almost exact while the
+learned visual residual is badly miscalibrated.
+```
+
 ## Demo Claim
 
 ## Remaining External Candidates
@@ -364,9 +435,9 @@ reports/demo_external_execution_gates.md
 Short version:
 
 ```text
-ProcTHOR and DeepMind Lab are now completed using source/checkouted simulator
-routes. Habitat-Sim and MineRL/MineDojo still require separate simulator
-environments before they can become fair WIT-VZ demos.
+ProcTHOR, DeepMind Lab, and Habitat-Sim are now completed using source,
+micromamba, or simulator-specific environment routes. MineRL/MineDojo still
+requires a separate Minecraft/Java environment and pose conversion verification.
 ```
 
 Use the demos in this order:
@@ -379,6 +450,7 @@ Use the demos in this order:
 5. AI2-THOR zero-shot failure as a more object-rich Unity-domain limitation demo.
 6. ProcTHOR zero-shot failure as a procedural Unity-house limitation demo.
 7. DeepMind Lab zero-shot as a small game-like external-domain positive sanity case.
+8. Habitat-Sim zero-shot failure as a photorealistic embodied-navigation limitation demo.
 ```
 
 The correct claim is:
@@ -387,7 +459,7 @@ The correct claim is:
 The current pipeline is portable to non-ViZDoom WIT-VZ-style data, but the
 learned checkpoint is not yet broadly domain-general. DeepMind Lab suggests
 that game-like visual/trajectory structure can help transfer, while MiniWorld,
-AI2-THOR, and ProcTHOR show that different dynamics, coordinate scale, and
-visual style still require scale calibration, adapter tuning, or external-domain
-training.
+AI2-THOR, ProcTHOR, and Habitat show that different dynamics, coordinate scale,
+and visual style still require scale calibration, adapter tuning, or
+external-domain training.
 ```

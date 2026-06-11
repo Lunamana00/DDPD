@@ -15,11 +15,12 @@ Use this folder as the shortest live-demo path for slides or screen sharing.
 | 7 | `07_ai2thor_external_overview.png` | Object-rich Unity-domain check: the same WIT-VZ formulation runs on AI2-THOR, but the ViZDoom checkpoint is not domain-general. |
 | 8 | `08_procthor_external_overview.png` | Procedural Unity-house check: source ProcTHOR runs through the same WIT-VZ path, and again exposes zero-shot domain shift. |
 | 9 | `09_deepmind_lab_external_overview.png` | Game-like external-domain check: DeepMind Lab runs through the same WIT-VZ path; unlike the simple random-walk external domains, visual prediction improves over CV on this small demo. |
+| 10 | `10_habitat_external_overview.png` | Photorealistic embodied-navigation check: Habitat-Sim runs through the same WIT-VZ path, but the ViZDoom checkpoint fails strongly under scale and visual-domain shift. |
 
 ## Claim Boundary
 
 The ViZDoom examples support in-domain scenario diversity, not broad game
-generalization. The MiniWorld, AI2-THOR, ProcTHOR, and DeepMind Lab examples support
+generalization. The MiniWorld, AI2-THOR, ProcTHOR, DeepMind Lab, and Habitat examples support
 formulation transfer and expose domain shift: the pipeline can run outside
 ViZDoom, but the ViZDoom-trained checkpoint is not calibrated for different
 dynamics, visual style, or coordinate scale. DeepMind Lab is the current

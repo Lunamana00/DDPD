@@ -1,4 +1,4 @@
-"""Render sample-by-sample demo video with CV / GT / model triptychs."""
+"""Render moving sample-by-sample demo video with CV / GT / model triptychs."""
 
 from __future__ import annotations
 
@@ -41,7 +41,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--width", type=int, default=1920)
     parser.add_argument("--height", type=int, default=1080)
     parser.add_argument("--fps", type=int, default=12)
-    parser.add_argument("--seconds-per-item", type=float, default=2.2)
+    parser.add_argument("--seconds-per-item", type=float, default=0.0, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--hold-last-frames",
+        type=int,
+        default=6,
+        help="Extra frames to hold after each sample's moving future sequence.",
+    )
+    parser.add_argument(
+        "--max-frames-per-item",
+        type=int,
+        default=0,
+        help="Optional cap on rendered future frames per sample. 0 renders the whole target horizon.",
+    )
     parser.add_argument(
         "--max-items-per-source",
         type=int,
@@ -172,6 +184,12 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def clipped_path(path: list[list[float]], length: int) -> list[list[float]]:
+    if length <= 0:
+        return []
+    return path[: min(length, len(path))]
+
+
 def existing(candidates: Iterable[Path]) -> Path | None:
     for path in candidates:
         if path.exists():
@@ -237,6 +255,50 @@ def resolve_frame_path(raw_dirs: dict[str, Path], rel_path: str, source_id: str 
     return None
 
 
+def load_step_frame_index(
+    sample: dict[str, Any],
+    raw_dirs: dict[str, Path],
+    source_id: str | None,
+) -> dict[int, Path | None]:
+    metadata = sample.get("metadata", {})
+    episode_path = metadata.get("raw_episode_path")
+    if not episode_path:
+        return {}
+    steps_path = resolve_frame_path(raw_dirs, str(episode_path), source_id)
+    if steps_path is None or not steps_path.exists():
+        return {}
+    index: dict[int, Path | None] = {}
+    for row in read_jsonl(steps_path):
+        if "step" not in row or "frame_path" not in row:
+            continue
+        index[int(row["step"])] = resolve_frame_path(raw_dirs, str(row["frame_path"]), source_id)
+    return index
+
+
+def moving_frame_paths(
+    sample: dict[str, Any],
+    raw_dirs: dict[str, Path],
+    source_id: str | None,
+    horizon_length: int,
+) -> list[Path | None]:
+    if horizon_length <= 0:
+        return []
+    center_step = int(sample.get("center_step", 0))
+    step_frames = load_step_frame_index(sample, raw_dirs, source_id)
+    paths: list[Path | None] = []
+    last_path = resolve_frame_path(raw_dirs, sample["rgb_history_paths"][-1], source_id)
+    for offset in range(1, horizon_length + 1):
+        path = step_frames.get(center_step + offset)
+        if path is None:
+            path = step_frames.get(center_step + offset - 1)
+        if path is None:
+            path = last_path
+        if path is not None:
+            last_path = path
+        paths.append(path)
+    return paths
+
+
 def selected_ids(summary_path: Path, max_items: int) -> list[tuple[str, str, str]]:
     summary = read_json(summary_path)
     if isinstance(summary, list):
@@ -290,11 +352,13 @@ def load_source_items(source: DemoSource, max_items_per_source: int) -> list[dic
         target = prediction.get("target") or sample.get("future_local_path") or []
         pred_path = prediction.get("prediction") or []
         cv_path = prediction.get("constant_velocity_prediction") or []
+        horizon_length = min(len(target), len(pred_path) or len(target), len(cv_path) or len(target))
         ade, fde = path_error(pred_path, target)
         cv_ade, cv_fde = path_error(cv_path, target) if cv_path else (float("nan"), float("nan"))
         source_id = sample.get("source", {}).get("source_id") or sample.get("metadata", {}).get("source_id")
         frame_rel = sample["rgb_history_paths"][-1]
         frame_path = resolve_frame_path(raw_dirs, frame_rel, source_id)
+        frame_paths = moving_frame_paths(sample, raw_dirs, source_id, horizon_length)
         items.append(
             {
                 "source": source.name,
@@ -302,6 +366,7 @@ def load_source_items(source: DemoSource, max_items_per_source: int) -> list[dic
                 "case": case,
                 "sample_id": sample_id,
                 "frame_path": frame_path,
+                "frame_paths": frame_paths,
                 "target": target,
                 "prediction": pred_path,
                 "cv": cv_path,
@@ -330,7 +395,17 @@ def axis_scale(*paths: list[list[float]]) -> float:
     return max_abs
 
 
-def draw_path_plot(path: list[list[float]], size: tuple[int, int], color: tuple[int, int, int], max_abs: float) -> Image.Image:
+def soft_color(color: tuple[int, int, int], mix: float = 0.76) -> tuple[int, int, int]:
+    return tuple(int(c * (1.0 - mix) + 255 * mix) for c in color)
+
+
+def draw_path_plot(
+    path: list[list[float]],
+    size: tuple[int, int],
+    color: tuple[int, int, int],
+    max_abs: float,
+    full_path: list[list[float]] | None = None,
+) -> Image.Image:
     width, height = size
     image = Image.new("RGB", size, "white")
     draw = ImageDraw.Draw(image)
@@ -347,11 +422,22 @@ def draw_path_plot(path: list[list[float]], size: tuple[int, int], color: tuple[
     draw.line((margin, cy, width - margin, cy), fill=(60, 65, 70), width=2)
     draw.text((cx + 4, margin - 22), "forward", fill=TEXT_COLOR, font=font(12))
     draw.text((width - 84, cy + 8), "right", fill=TEXT_COLOR, font=font(12))
+    full_points = [
+        (cx + float(right) * scale, cy - float(forward) * scale)
+        for forward, right in full_path or []
+    ]
+    if len(full_points) > 1:
+        draw.line(full_points, fill=soft_color(color), width=3)
+    for px, py in full_points:
+        draw.ellipse((px - 3, py - 3, px + 3, py + 3), fill=soft_color(color, 0.66))
     points = [(cx + float(right) * scale, cy - float(forward) * scale) for forward, right in path or []]
     if len(points) > 1:
-        draw.line(points, fill=color, width=5)
+        draw.line(points, fill=color, width=6)
     for px, py in points:
-        draw.ellipse((px - 4, py - 4, px + 4, py + 4), fill=color)
+        draw.ellipse((px - 5, py - 5, px + 5, py + 5), fill=color)
+    if points:
+        px, py = points[-1]
+        draw.ellipse((px - 8, py - 8, px + 8, py + 8), outline=color, width=3)
     draw.ellipse((cx - 5, cy - 5, cx + 5, cy + 5), fill=(30, 30, 30))
     return image
 
@@ -387,6 +473,7 @@ def draw_column(
     subtitle: str,
     rgb: Image.Image,
     path: list[list[float]],
+    full_path: list[list[float]],
     color: tuple[int, int, int],
     max_abs: float,
 ) -> None:
@@ -396,17 +483,27 @@ def draw_column(
     draw.text((x + 22, y + 56), subtitle, fill=MUTED_COLOR, font=font(17))
     frame_box = (x + 24, y + 92, x + w - 24, y + 392)
     paste_center(canvas, rgb, frame_box)
-    plot = draw_path_plot(path, (w - 48, h - 430), color, max_abs)
+    plot = draw_path_plot(path, (w - 48, h - 430), color, max_abs, full_path)
     canvas.paste(plot, (x + 24, y + 408))
 
 
-def render_item(item: dict[str, Any], order: int, total: int, width: int, height: int) -> Image.Image:
+def render_item_frame(
+    item: dict[str, Any],
+    order: int,
+    total: int,
+    progress: int,
+    frame_path: Path | None,
+    width: int,
+    height: int,
+) -> Image.Image:
     canvas = Image.new("RGB", (width, height), BG_COLOR)
     draw = ImageDraw.Draw(canvas)
     header = f"{order:02d}/{total:02d}  {item['source']} / {item['label']} / {item['case']}"
     draw.text((46, 28), header, fill=TEXT_COLOR, font=font(34, bold=True))
+    horizon = max(len(item["target"]), len(item["prediction"]), len(item["cv"]))
     metrics = (
         f"sample={item['sample_id']}    "
+        f"t={min(progress + 1, horizon):02d}/{horizon:02d}    "
         f"model ADE/FDE={item['ADE']:.2f}/{item['FDE']:.2f}    "
         f"CV ADE/FDE={item['cv_ADE']:.2f}/{item['cv_FDE']:.2f}"
     )
@@ -416,11 +513,51 @@ def render_item(item: dict[str, Any], order: int, total: int, width: int, height
     top = 142
     col_w = (width - 2 * margin_x - 2 * col_gap) // 3
     col_h = height - top - 44
-    rgb = load_rgb(item["frame_path"], (col_w - 52, 300))
+    rgb = load_rgb(frame_path, (col_w - 52, 300))
     max_abs = axis_scale(item["cv"], item["target"], item["prediction"])
-    draw_column(canvas, margin_x, top, col_w, col_h, "CV baseline", "recent-motion extrapolation", rgb, item["cv"], CV_COLOR, max_abs)
-    draw_column(canvas, margin_x + col_w + col_gap, top, col_w, col_h, "GT", "future local path label", rgb, item["target"], GT_COLOR, max_abs)
-    draw_column(canvas, margin_x + 2 * (col_w + col_gap), top, col_w, col_h, "Prediction", "visual cue-memory output", rgb, item["prediction"], PRED_COLOR, max_abs)
+    shown = progress + 1
+    draw_column(
+        canvas,
+        margin_x,
+        top,
+        col_w,
+        col_h,
+        "CV baseline",
+        "recent-motion extrapolation",
+        rgb,
+        clipped_path(item["cv"], shown),
+        item["cv"],
+        CV_COLOR,
+        max_abs,
+    )
+    draw_column(
+        canvas,
+        margin_x + col_w + col_gap,
+        top,
+        col_w,
+        col_h,
+        "GT",
+        "future local path label",
+        rgb,
+        clipped_path(item["target"], shown),
+        item["target"],
+        GT_COLOR,
+        max_abs,
+    )
+    draw_column(
+        canvas,
+        margin_x + 2 * (col_w + col_gap),
+        top,
+        col_w,
+        col_h,
+        "Prediction",
+        "visual cue-memory output",
+        rgb,
+        clipped_path(item["prediction"], shown),
+        item["prediction"],
+        PRED_COLOR,
+        max_abs,
+    )
     return canvas
 
 
@@ -434,14 +571,20 @@ def write_video(items: list[dict[str, Any]], args: argparse.Namespace) -> None:
     )
     if not writer.isOpened():
         raise RuntimeError(f"Could not open writer: {args.output}")
-    repeats = max(1, round(args.seconds_per_item * args.fps))
     try:
         total = len(items)
         for index, item in enumerate(items, start=1):
-            frame = render_item(item, index, total, args.width, args.height)
-            frame_bgr = cv2.cvtColor(np.asarray(frame), cv2.COLOR_RGB2BGR)
-            for _ in range(repeats):
-                writer.write(frame_bgr)
+            frame_paths = item["frame_paths"] or [item["frame_path"]]
+            if args.max_frames_per_item > 0:
+                frame_paths = frame_paths[: args.max_frames_per_item]
+            last_frame_bgr: np.ndarray | None = None
+            for progress, frame_path in enumerate(frame_paths):
+                frame = render_item_frame(item, index, total, progress, frame_path, args.width, args.height)
+                last_frame_bgr = cv2.cvtColor(np.asarray(frame), cv2.COLOR_RGB2BGR)
+                writer.write(last_frame_bgr)
+            if last_frame_bgr is not None:
+                for _ in range(max(0, args.hold_last_frames)):
+                    writer.write(last_frame_bgr)
     finally:
         writer.release()
 
@@ -457,16 +600,30 @@ def main() -> None:
     if not all_items:
         raise RuntimeError("No renderable demo items found.")
     write_video(all_items, args)
+    total_moving_frames = sum(
+        min(len(item["frame_paths"]), args.max_frames_per_item) if args.max_frames_per_item > 0 else len(item["frame_paths"])
+        for item in all_items
+    )
+    missing_frame_count = sum(1 for item in all_items for path in item["frame_paths"] if path is None or not path.exists())
     manifest = {
         "output": str(args.output),
+        "mode": "moving_raw_episode_frames",
         "fps": args.fps,
-        "seconds_per_item": args.seconds_per_item,
+        "hold_last_frames": args.hold_last_frames,
+        "max_frames_per_item": args.max_frames_per_item,
+        "moving_frames": total_moving_frames,
+        "missing_frame_count": missing_frame_count,
         "items": [
             {
                 "source": item["source"],
                 "label": item["label"],
                 "case": item["case"],
                 "sample_id": item["sample_id"],
+                "frames_rendered": (
+                    min(len(item["frame_paths"]), args.max_frames_per_item)
+                    if args.max_frames_per_item > 0
+                    else len(item["frame_paths"])
+                ),
                 "ADE": item["ADE"],
                 "FDE": item["FDE"],
                 "cv_ADE": item["cv_ADE"],

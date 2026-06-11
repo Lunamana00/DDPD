@@ -7,7 +7,8 @@ Use this folder as the shortest live-demo path for slides or screen sharing.
 | File | Description |
 |---|---|
 | `demo_full_sequence.mp4` | 42-second 1080p walkthrough of the full 1-11 demo sequence below. Static contact sheets are held briefly, and GIF segments retain motion. |
-| `demo_triptych_sequence.mp4` | 180-second 1080p sample-by-sample walkthrough. Each scene is rendered as three aligned panels: left = constant-velocity baseline, center = ground truth, right = model prediction. |
+| `demo_triptych_moving_sequence.mp4` | 210-second 1080p moving scene walkthrough. Each selected raw episode segment is rendered frame-by-frame with three aligned panels: left = constant-velocity baseline, center = ground truth, right = model prediction. The RGB scene moves over time while each path plot progressively reveals the corresponding trajectory. |
+| `demo_triptych_sequence.mp4` | 180-second 1080p static sample-by-sample walkthrough. Each scene is rendered as three aligned panels: left = constant-velocity baseline, center = ground truth, right = model prediction. |
 
 ## Sequence
 

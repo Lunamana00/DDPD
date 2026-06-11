@@ -1,7 +1,8 @@
 # External Demo Execution Gates
 
 This report records the current execution state of the external demo candidates
-after the completed MiniWorld and AI2-THOR zero-shot demos.
+after the completed MiniWorld, AI2-THOR, ProcTHOR, and DeepMind Lab zero-shot
+demos.
 
 ## Current Status
 
@@ -10,7 +11,7 @@ after the completed MiniWorld and AI2-THOR zero-shot demos.
 | MiniWorld | Completed | `reports/demo/external_miniworld_zero_shot_03s/` | Use as a lightweight external-domain failure/sanity demo. |
 | AI2-THOR | Completed | `reports/demo/external_ai2thor_zero_shot_03s/` | Use as the object-rich Unity-domain failure/sanity demo. |
 | ProcTHOR | Completed with source checkout | `reports/demo/external_procthor_zero_shot_03s/` | Use as a procedural Unity-house domain-shift failure demo. |
-| DeepMind Lab | Environment gate not satisfied | No `deepmind_lab` pip candidate in this venv check; no `bazel` installed on `gpuserver3090`. | Keep as future game-like extension. |
+| DeepMind Lab | Completed with source build | `reports/demo/external_deepmind_lab_zero_shot_03s/` | Use as the small game-like external-domain positive sanity case. |
 | Habitat-Sim | Environment gate not satisfied | No `habitat-sim` pip candidate in this venv check; no conda/mamba installed on `gpuserver3090`. | Keep as future robotics/photorealistic extension. |
 | MineRL / MineDojo | Environment gate not satisfied | `minerl` and `minedojo` exist on PyPI, but Java is absent on `gpuserver3090`; WIT-VZ pose conversion is not direct. | Keep as future Minecraft-style extension. |
 
@@ -30,7 +31,7 @@ moviepy==1.0.3
 minerl: not-installed
 minedojo: not-installed
 habitat-sim: not-installed
-deepmind_lab: not-installed
+deepmind_lab: installed in separate /home/taehyun/projects/dmlab_env
 ```
 
 System tools:
@@ -38,7 +39,7 @@ System tools:
 ```text
 xvfb-run: available
 git/gcc/g++: available
-bazel: missing
+bazel: installed user-space through Bazelisk at ~/bin/bazel
 conda/mamba: missing
 java: missing
 home disk: 624G free
@@ -135,7 +136,7 @@ ADE/FDE: 79.794 / 134.560
 CV ADE/FDE: 1.158 / 2.288
 ```
 
-## DeepMind Lab Gate
+## DeepMind Lab Source Build And Completed Demo
 
 Why it is still useful:
 
@@ -144,20 +145,53 @@ DeepMind Lab is the most game-like candidate after ViZDoom: first-person 3D
 levels, navigation tasks, RGB observations, and action-based movement.
 ```
 
-Current blocker:
+Build route:
 
 ```text
-bazel: missing on gpuserver3090
-deepmind_lab: no direct pip candidate in the current venv check
+Bazelisk installed at ~/bin/bazel
+DeepMind Lab source checkout: ~/projects/external_sources/deepmind_lab
+source commit: b1db91a
+Bazel version used: 6.5.0
+local user-space dev packages: SDL2, OSMesa, libffi, gettext
+wheel: /tmp/dmlab_pkg/deepmind_lab-1.0-py3-none-any.whl
+runtime venv: ~/projects/dmlab_env with numpy<2, dm_env, six, pillow
 ```
 
-Required route:
+Important build notes:
 
 ```text
-1. Install Bazel and DeepMind Lab system build dependencies.
-2. Build DeepMind Lab from source or use a known wheel/Docker image.
-3. Run a random-agent level with RGB and velocity/pose observations.
-4. Convert frames plus pose deltas to WIT-VZ raw schema.
+1. Bazel 9 failed because the upstream WORKSPACE/BUILD files are not bzlmod-ready.
+2. Bazel 6.5.0 worked after pinning Abseil to 20230125.3.
+3. The source tree needed user-space SDL2/OSMesa/libffi/gettext dev packages
+   because sudo apt install is not available.
+4. The DDPD venv has NumPy 2.2.6, but the DMLab native module needs NumPy 1.x
+   ABI compatibility, so collection runs in a separate venv.
+5. DeepMind Lab exposes RGB plus `DEBUG.POS.TRANS` and `DEBUG.POS.ROT`, so
+   WIT-VZ future local path labels can be built without velocity integration.
+```
+
+Smoke-test result:
+
+```text
+level: nav_maze_static_01
+observations: RGB_INTERLEAVED, DEBUG.POS.TRANS, DEBUG.POS.ROT, VEL.TRANS, VEL.ROT
+RGB shape: [120, 160, 3]
+step: success
+```
+
+Completed WIT-VZ run:
+
+```text
+collector: scripts/collect_deepmind_lab_wit_vz.py
+raw: data/wit_vz/raw/deepmind_lab_demo_001
+processed: data/wit_vz/processed/deepmind_lab_demo_001_03s
+levels: nav_maze_static_01, nav_maze_random_goal_01, seekavoid_arena_01, lt_chasm
+episodes: 4
+frames: 200
+samples: 124
+zero-shot output: reports/demo/external_deepmind_lab_zero_shot_03s/
+ADE/FDE: 155.288 / 239.752
+CV ADE/FDE: 180.822 / 306.231
 ```
 
 ## Habitat-Sim Gate
@@ -232,14 +266,15 @@ Use completed demos only:
 4. MiniWorld external zero-shot failure.
 5. AI2-THOR external zero-shot failure.
 6. ProcTHOR external zero-shot failure.
+7. DeepMind Lab external zero-shot positive sanity case.
 ```
 
 Mention the remaining candidates as future work:
 
 ```text
-ProcTHOR is now completed with a source checkout. DeepMind Lab, Habitat, and
-MineRL/MineDojo need separate simulator environments before they can become
-fair WIT-VZ demos.
+ProcTHOR and DeepMind Lab are now completed with source-checkout/build routes.
+Habitat and MineRL/MineDojo need separate simulator environments before they
+can become fair WIT-VZ demos.
 ```
 
 ## Source Pointers

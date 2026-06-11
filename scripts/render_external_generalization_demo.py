@@ -69,6 +69,7 @@ def load_raw_context(dataset_dir: Path) -> tuple[dict[str, Path], dict[str, dict
             label = (
                 summary.get("env_id")
                 or summary.get("scene")
+                or summary.get("level")
                 or raw_manifest.get("scenario")
                 or raw_manifest.get("env_name")
                 or source_id

@@ -253,11 +253,47 @@ ADE 79.794 / FDE 134.560, while constant velocity is ADE 1.158 / FDE 2.288.
 This is a procedural Unity-house domain-shift limitation demo.
 ```
 
-### 2.4 Later Candidates
+### 2.4 DeepMind Lab
+
+Role:
+
+```text
+Game-like external first-person navigation domain.
+Compared with MiniWorld/AI2-THOR/ProcTHOR, it is visually closer to a game
+and contains more maze/turn-style movement.
+```
+
+Collector:
+
+```text
+scripts/collect_deepmind_lab_wit_vz.py
+```
+
+Execution note:
+
+```text
+DeepMind Lab was built from source on gpuserver3090 using Bazelisk/Bazel 6.5.0
+and user-space SDL2/OSMesa/libffi/gettext dev packages. Collection runs in a
+separate dmlab_env because the native module needs NumPy 1.x ABI compatibility.
+```
+
+Current demo result:
+
+```text
+reports/demo/external_deepmind_lab_zero_shot_03s/
+
+DeepMind Lab zero-shot was run on 124 samples from 4 levels:
+nav_maze_static_01, nav_maze_random_goal_01, seekavoid_arena_01, lt_chasm.
+The pipeline runs, and unlike the other external demos the model improves over
+constant velocity:
+ADE 155.288 / FDE 239.752, while constant velocity is ADE 180.822 / FDE 306.231.
+This is a small positive external-domain sanity demo, not broad generalization proof.
+```
+
+### 2.5 Later Candidates
 
 | Candidate | Use | Risk |
 |---|---|---|
-| DeepMind Lab | Most game-like external environment after ViZDoom. | Requires Bazel/source build or a known working wheel/container. |
 | MineRL / MineDojo | Minecraft game data and human demonstrations. | Requires Java/headless setup and reliable pose-to-local-path conversion. |
 | Habitat-Sim | Photorealistic indoor navigation. | Requires conda/mamba or container install; more robotics than game. |
 | WorldCam-50h | Real gameplay video + camera pose. | Dataset-style extension, not a quick playable simulator demo. |
@@ -273,15 +309,18 @@ Use this order for presentation:
 4. MiniWorld external zero-shot: quick cross-domain sanity check.
 5. AI2-THOR external zero-shot: object-rich Unity-domain limitation demo.
 6. ProcTHOR external zero-shot: procedural Unity-house limitation demo.
-7. DeepMind Lab / MineRL / Habitat: future expansion candidates with gates documented in reports/demo_external_execution_gates.md.
+7. DeepMind Lab external zero-shot: small game-like positive sanity demo.
+8. MineRL / Habitat: future expansion candidates with gates documented in reports/demo_external_execution_gates.md.
 ```
 
 Claim boundary:
 
 ```text
 ViZDoom multi-scenario results support in-domain scenario diversity.
-MiniWorld/AI2-THOR results support external formulation transfer and domain-shift analysis.
-They should not be oversold as proven broad game generalization unless retrained and evaluated with matched splits.
+MiniWorld/AI2-THOR/ProcTHOR/DeepMind Lab results support external formulation
+transfer and domain-shift analysis. DMLab is currently the only small external
+demo where the zero-shot checkpoint beats CV, but it should not be oversold as
+proven broad game generalization unless retrained and evaluated with matched splits.
 ```
 
 ## 4. Reference Links

@@ -9,7 +9,7 @@ This report tracks what has actually been run outside ViZDoom.
 | MiniWorld | Completed | `reports/demo/external_miniworld_zero_shot_03s/` | The WIT-VZ input/output formulation transfers, but the ViZDoom checkpoint does not zero-shot generalize well. |
 | AI2-THOR | Completed | `reports/demo/external_ai2thor_zero_shot_03s/` | The WIT-VZ schema also runs on object-rich Unity indoor scenes, but the ViZDoom checkpoint fails under this domain shift. |
 | ProcTHOR | Completed with source checkout | `reports/demo/external_procthor_zero_shot_03s/` | Source ProcTHOR runs through the same WIT-VZ path; the ViZDoom checkpoint fails even more strongly under procedural-house domain shift. |
-| DeepMind Lab | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Good game-like future extension, but requires Bazel/source build or a known working wheel/container. |
+| DeepMind Lab | Completed with source build | `reports/demo/external_deepmind_lab_zero_shot_03s/` | Source DeepMind Lab runs through the same WIT-VZ path; on this small game-like demo the model improves over CV, but the result is not yet a broad generalization claim. |
 | Habitat | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Useful robotics-style domain shift, but current server lacks conda/mamba and `habitat-sim`. |
 | MineRL / MineDojo | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Game-like, but current server lacks Java and pose-to-WIT-VZ conversion must be verified. |
 
@@ -267,6 +267,90 @@ rollouts are locally simple, while the ViZDoom-trained visual head overreacts
 to unfamiliar indoor colors, geometry, and scale.
 ```
 
+## DeepMind Lab Zero-Shot Demo
+
+DeepMind Lab required a source build rather than a direct pip install:
+
+```text
+source: https://github.com/google-deepmind/lab
+source commit: b1db91a
+build route: Bazelisk + Bazel 6.5.0 + local user-space SDL2/OSMesa/libffi/gettext dev packages
+runtime env: separate ~/projects/dmlab_env with numpy<2
+```
+
+Why a separate runtime env was used:
+
+```text
+The DeepMind Lab native module was built against the NumPy 1.x ABI.
+The main DDPD venv uses NumPy 2.2.6, so the collector runs in a separate
+DeepMind Lab venv and the resulting raw WIT-VZ data is evaluated by the normal
+DDPD stack afterward.
+```
+
+Data collection:
+
+```bash
+python scripts/collect_deepmind_lab_wit_vz.py \
+  --out-root data/wit_vz/raw \
+  --run-id deepmind_lab_demo_001 \
+  --levels nav_maze_static_01 nav_maze_random_goal_01 seekavoid_arena_01 lt_chasm \
+  --episodes-per-level 1 \
+  --max-steps 50 \
+  --fps 5 \
+  --width 160 \
+  --height 120 \
+  --seed 1101 \
+  --overwrite
+```
+
+Processed WIT-VZ samples:
+
+```text
+dataset: data/wit_vz/processed/deepmind_lab_demo_001_03s
+levels: 4
+episodes: 4
+frames: 200
+samples: 124
+history: 1s, 5 frames
+future: 3s, 15 waypoints
+split: episode-disjoint
+```
+
+Result on all DeepMind Lab demo samples:
+
+| Model | ADE | FDE |
+|---|---:|---:|
+| ViZDoom-trained DINOv3 cue-memory checkpoint, zero-shot DeepMind Lab | 155.288 | 239.752 |
+| Constant-velocity baseline | 180.822 | 306.231 |
+
+Hard-CV subset:
+
+| Model | ADE | FDE |
+|---|---:|---:|
+| ViZDoom-trained checkpoint | 256.349 | 423.052 |
+| Constant-velocity baseline | 345.598 | 619.168 |
+
+Visualization:
+
+```text
+reports/demo/external_deepmind_lab_zero_shot_03s/contact_by_level/contact_sheet.png
+reports/demo/presentation_sequence/09_deepmind_lab_external_overview.png
+```
+
+Interpretation:
+
+```text
+This is the first external zero-shot demo where the ViZDoom-trained checkpoint
+beats constant velocity on the collected samples. The likely reason is that
+DeepMind Lab has more game-like first-person visual structure and more
+turn/maze-like trajectory changes than MiniWorld, AI2-THOR, and ProcTHOR.
+
+However, this is still only a small demonstration run: 4 levels, 4 episodes,
+124 samples. It should be presented as "the formulation and learned visual
+residual can transfer to another game-like domain in some cases", not as proof
+of broad zero-shot game generalization.
+```
+
 ## Demo Claim
 
 ## Remaining External Candidates
@@ -280,9 +364,9 @@ reports/demo_external_execution_gates.md
 Short version:
 
 ```text
-ProcTHOR is now completed using a source checkout. DeepMind Lab, Habitat-Sim,
-and MineRL/MineDojo still require separate simulator environments before they
-can become fair WIT-VZ demos.
+ProcTHOR and DeepMind Lab are now completed using source/checkouted simulator
+routes. Habitat-Sim and MineRL/MineDojo still require separate simulator
+environments before they can become fair WIT-VZ demos.
 ```
 
 Use the demos in this order:
@@ -294,12 +378,16 @@ Use the demos in this order:
 4. MiniWorld zero-shot failure as domain-shift evidence.
 5. AI2-THOR zero-shot failure as a more object-rich Unity-domain limitation demo.
 6. ProcTHOR zero-shot failure as a procedural Unity-house limitation demo.
+7. DeepMind Lab zero-shot as a small game-like external-domain positive sanity case.
 ```
 
 The correct claim is:
 
 ```text
 The current pipeline is portable to non-ViZDoom WIT-VZ-style data, but the
-learned checkpoint is not yet broadly domain-general. External domains require
-scale calibration, adapter tuning, or external-domain training.
+learned checkpoint is not yet broadly domain-general. DeepMind Lab suggests
+that game-like visual/trajectory structure can help transfer, while MiniWorld,
+AI2-THOR, and ProcTHOR show that different dynamics, coordinate scale, and
+visual style still require scale calibration, adapter tuning, or external-domain
+training.
 ```

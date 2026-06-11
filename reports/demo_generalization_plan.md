@@ -158,35 +158,36 @@ Object-rich Unity indoor domain.
 Good for showing a more realistic cross-domain setting than MiniWorld.
 ```
 
-Collector already exists:
+AI2-THOR collector:
 
 ```text
 scripts/collect_ai2thor_wit_vz.py
 ```
 
-Example commands:
+Demo command used on `gpuserver3090`:
 
 ```bash
-uv pip install ai2thor
-
-uv run python scripts/collect_ai2thor_wit_vz.py \
+python scripts/collect_ai2thor_wit_vz.py \
   --out-root data/wit_vz/raw \
-  --run-id ai2thor_nav_001 \
-  --scenes FloorPlan1 FloorPlan2 FloorPlan201 FloorPlan301 \
-  --episodes-per-scene 5 \
-  --max-steps 240 \
+  --run-id ai2thor_demo_001 \
+  --scenes FloorPlan1 FloorPlan201 \
+  --episodes-per-scene 1 \
+  --max-steps 50 \
   --fps 5 \
+  --width 160 \
+  --height 120 \
   --platform CloudRendering \
-  --headless \
+  --gpu-device 0 \
+  --vulkan-library /home/taehyun/local_libs/vulkan/usr/lib/x86_64-linux-gnu/libvulkan.so.1 \
   --overwrite
 ```
 
-Then build WIT-VZ samples the same way:
+Then build WIT-VZ samples:
 
 ```bash
 uv run python -m src.wit_vz.build_samples \
-  --raw data/wit_vz/raw/ai2thor_nav_001 \
-  --out data/wit_vz/processed/ai2thor_nav_001 \
+  --raw data/wit_vz/raw/ai2thor_demo_001 \
+  --out data/wit_vz/processed/ai2thor_demo_001_03s \
   --history-sec 1.0 \
   --future-sec 3.0 \
   --sample-fps 5 \
@@ -195,15 +196,24 @@ uv run python -m src.wit_vz.build_samples \
   --seed 901
 ```
 
-Current execution gate:
+Current demo result:
 
 ```text
-Local Windows AI2-THOR 5.0 failed because no matching Windows build was available.
-GPU server CloudRendering failed because libvulkan1 is missing.
+reports/demo/external_ai2thor_zero_shot_03s/
 
-Required server setup:
-sudo apt-get update
-sudo apt-get install -y libvulkan1
+AI2-THOR zero-shot was run on 62 samples from 2 AI2-THOR scenes.
+The pipeline runs, but the ViZDoom checkpoint again fails to generalize:
+ADE 51.372 / FDE 83.158, while constant velocity is ADE 1.028 / FDE 1.922.
+This is a stronger object-rich domain-shift limitation demo than MiniWorld.
+It should not be presented as a successful zero-shot result.
+```
+
+Execution note:
+
+```text
+CloudRendering worked on gpuserver3090 with a rootless libvulkan1/vulkan-tools setup.
+Do not pass --headless for visual collection because it can return metadata without RGB frames.
+ProcTHOR is still a planned extension, not collected in this pass.
 ```
 
 ### 2.3 Later Candidates
@@ -224,7 +234,8 @@ Use this order for presentation:
 2. ViZDoom hard-case GIFs: six short playable-looking examples.
 3. ViZDoom 10s contact sheet: long-horizon limitation and trajectory drift.
 4. MiniWorld external zero-shot: quick cross-domain sanity check.
-5. AI2-THOR external zero-shot or adapter-tuned: object-rich domain-shift demo.
+5. AI2-THOR external zero-shot: object-rich Unity-domain limitation demo.
+6. ProcTHOR / DeepMind Lab / MineRL / Habitat: future expansion candidates.
 ```
 
 Claim boundary:

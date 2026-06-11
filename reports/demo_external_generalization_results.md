@@ -7,7 +7,8 @@ This report tracks what has actually been run outside ViZDoom.
 | Domain | Status | Evidence | Interpretation |
 |---|---|---|---|
 | MiniWorld | Completed | `reports/demo/external_miniworld_zero_shot_03s/` | The WIT-VZ input/output formulation transfers, but the ViZDoom checkpoint does not zero-shot generalize well. |
-| AI2-THOR / ProcTHOR | Environment blocked | Local Windows has no matching AI2-THOR build; GPU server lacks `libvulkan1` for CloudRendering. | Collector is ready, but execution requires system-level Unity rendering dependency setup. |
+| AI2-THOR | Completed | `reports/demo/external_ai2thor_zero_shot_03s/` | The WIT-VZ schema also runs on object-rich Unity indoor scenes, but the ViZDoom checkpoint fails under this domain shift. |
+| ProcTHOR | Planned only | Uses the same AI2-THOR collector path, but was not collected in this demo pass. | Good next step for larger synthetic house diversity after the AI2-THOR smoke demo. |
 | DeepMind Lab | Planned only | Official candidate in `reports/demo_generalization_plan.md` | Good game-like future extension, heavier install/export work. |
 | Habitat | Planned only | Official candidate in `reports/demo_generalization_plan.md` | Useful robotics-style domain shift, less game-like. |
 | MineRL / MineDojo | Planned only | Candidate in `reports/demo_generalization_plan.md` | Game-like but action logs must be converted into local future path labels. |
@@ -85,48 +86,102 @@ dynamics. In MiniWorld, recent-motion extrapolation is almost perfect because
 the trajectories are locally simple, so the learned visual residual hurts.
 ```
 
-## AI2-THOR / ProcTHOR Status
+## AI2-THOR Zero-Shot Demo
 
-The collector is implemented:
-
-```text
-scripts/collect_ai2thor_wit_vz.py
-```
-
-Local Windows run failed before scene collection:
-
-```text
-ValueError: Invalid commit_id ... no build exists for arch=Windows
-```
-
-GPU server Linux CloudRendering run also failed before scene collection:
-
-```text
-Platform CloudRendering failed validation with the following errors:
-Vulkan API driver missing.
-CloudRendering requires libvulkan1.
-```
-
-Next required server setup:
+Server setup:
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y libvulkan1
+# rootless Vulkan workaround on gpuserver3090
+apt-get download libvulkan1
+dpkg-deb -x libvulkan1_*_amd64.deb ~/local_libs/vulkan
+ln -sf libvulkan.so.1.3.204 ~/local_libs/vulkan/usr/lib/x86_64-linux-gnu/libvulkan.so
+
+apt-get download vulkan-tools
+dpkg-deb -x vulkan-tools_*_amd64.deb ~/local_libs/vulkan-tools
 ```
 
-Then rerun:
+Data collection:
 
 ```bash
 python scripts/collect_ai2thor_wit_vz.py \
   --out-root data/wit_vz/raw \
   --run-id ai2thor_demo_001 \
-  --scenes FloorPlan1 FloorPlan2 FloorPlan201 FloorPlan301 \
-  --episodes-per-scene 2 \
-  --max-steps 120 \
+  --scenes FloorPlan1 FloorPlan201 \
+  --episodes-per-scene 1 \
+  --max-steps 50 \
   --fps 5 \
+  --width 160 \
+  --height 120 \
   --platform CloudRendering \
-  --headless \
+  --gpu-device 0 \
+  --vulkan-library /home/taehyun/local_libs/vulkan/usr/lib/x86_64-linux-gnu/libvulkan.so.1 \
   --overwrite
+```
+
+Important execution note:
+
+```text
+Do not pass --headless for visual collection.
+With AI2-THOR 5.0 CloudRendering, headless=True returned metadata but no RGB frame.
+```
+
+Processed WIT-VZ samples:
+
+```text
+dataset: data/wit_vz/processed/ai2thor_demo_001_03s
+episodes: 2
+frames: 100
+samples: 62
+history: 1s, 5 frames
+future: 3s, 15 waypoints
+split: episode-disjoint
+```
+
+Zero-shot evaluation command:
+
+```bash
+uv run python -m src.eval_path_predictor \
+  --dataset data/wit_vz/processed/ai2thor_demo_001_03s \
+  --checkpoint checkpoints/wit_vz_v4_defaults_dinov3_single_03s.pt \
+  --output-dir reports/demo/external_ai2thor_zero_shot_03s/eval_all \
+  --split all \
+  --batch-size 8 \
+  --device auto \
+  --num-workers 0 \
+  --backbone-override dinov3_convnext_tiny \
+  --image-size-override 256 \
+  --ignore-checkpoint-visual-cache
+```
+
+Result on all AI2-THOR demo samples:
+
+| Model | ADE | FDE |
+|---|---:|---:|
+| ViZDoom-trained DINOv3 cue-memory checkpoint, zero-shot AI2-THOR | 51.372 | 83.158 |
+| Constant-velocity baseline | 1.028 | 1.922 |
+
+Hard-CV subset:
+
+| Model | ADE | FDE |
+|---|---:|---:|
+| ViZDoom-trained checkpoint | 49.574 | 80.641 |
+| Constant-velocity baseline | 1.737 | 3.250 |
+
+Visualization:
+
+```text
+reports/demo/external_ai2thor_zero_shot_03s/contact_by_scene/contact_sheet.png
+reports/demo/presentation_sequence/07_ai2thor_external_overview.png
+```
+
+Interpretation:
+
+```text
+This is also not evidence of successful zero-shot generalization.
+It is evidence that the WIT-VZ data schema and inference stack can be ported
+to Unity indoor scenes. The checkpoint itself is strongly miscalibrated outside
+ViZDoom: coordinate scale, visual appearance, and simple scripted movement make
+constant velocity much stronger than the learned visual residual.
 ```
 
 ## Demo Claim
@@ -138,7 +193,7 @@ Use the demos in this order:
 2. ViZDoom hard-case GIFs.
 3. ViZDoom 10s long-horizon failure.
 4. MiniWorld zero-shot failure as domain-shift evidence.
-5. AI2-THOR as a prepared but system-dependency-blocked next demo.
+5. AI2-THOR zero-shot failure as a more object-rich Unity-domain limitation demo.
 ```
 
 The correct claim is:

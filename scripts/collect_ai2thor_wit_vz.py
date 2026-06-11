@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import ctypes.util
 import json
+import os
 import random
 import shutil
 import sys
@@ -42,15 +44,37 @@ def parse_args() -> argparse.Namespace:
         help="Nominal sampling rate written to the WIT-VZ manifest. One AI2-THOR action step is treated as one frame.",
     )
     parser.add_argument("--grid-size", type=float, default=0.25)
-    parser.add_argument("--rotate-step-degrees", type=float, default=45.0)
+    parser.add_argument(
+        "--rotate-step-degrees",
+        type=float,
+        default=90.0,
+        help="AI2-THOR grid rotation step. Keep the default 90 when snapToGrid is enabled.",
+    )
     parser.add_argument(
         "--platform",
         default="auto",
         help="AI2-THOR platform name, e.g. auto, CloudRendering, Linux64, Windows64, OSXIntel64.",
     )
-    parser.add_argument("--headless", action="store_true", help="Pass headless=True to the AI2-THOR Controller.")
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help=(
+            "Pass headless=True to the AI2-THOR Controller. Use this only for "
+            "metadata checks: in AI2-THOR 5.0 it can suppress RGB frames, so "
+            "CloudRendering visual collection should normally omit this flag."
+        ),
+    )
     parser.add_argument("--x-display", default=None, help="Optional X display for Linux servers, e.g. :0.")
     parser.add_argument("--gpu-device", type=int, default=None, help="Optional GPU index for AI2-THOR rendering.")
+    parser.add_argument(
+        "--vulkan-library",
+        type=Path,
+        default=None,
+        help=(
+            "Optional libvulkan.so path for rootless CloudRendering setups. "
+            "This patches AI2-THOR's ctypes.util.find_library validation."
+        ),
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -79,7 +103,32 @@ def resolve_platform(name: str) -> Any:
     return getattr(platform_module, name)
 
 
+def patch_vulkan_find_library(vulkan_library: Path | None) -> None:
+    if vulkan_library is None:
+        return
+    resolved = vulkan_library.expanduser().resolve()
+    if not resolved.exists():
+        raise FileNotFoundError(f"Requested --vulkan-library does not exist: {resolved}")
+    original_find_library = ctypes.util.find_library
+
+    def find_library_with_vulkan(name: str) -> str | None:
+        if name == "vulkan":
+            return str(resolved)
+        return original_find_library(name)
+
+    ctypes.util.find_library = find_library_with_vulkan
+    lib_dir = str(resolved.parent)
+    current = os.environ.get("LD_LIBRARY_PATH", "")
+    if lib_dir not in current.split(":"):
+        os.environ["LD_LIBRARY_PATH"] = f"{lib_dir}:{current}" if current else lib_dir
+
+
 def save_frame(frame: Any, path: Path) -> None:
+    if frame is None:
+        raise RuntimeError(
+            "AI2-THOR returned no RGB frame. If you used --headless, rerun without it; "
+            "for GPU-server visual collection prefer --platform CloudRendering without --headless."
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(frame).save(path)
 
@@ -185,6 +234,7 @@ def main() -> None:
         shutil.rmtree(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    patch_vulkan_find_library(args.vulkan_library)
     Controller = import_ai2thor()
     controller = Controller(
         width=args.width,

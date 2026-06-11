@@ -45,12 +45,12 @@ from src.wit_vz.collect import BUTTON_NAMES, GAME_VARIABLE_NAMES, get_screen_res
 from src.wit_vz.geometry import world_delta_to_local, wrap_degrees  # noqa: E402
 
 
-METHODS = [
-    ("cv", "CV baseline", "recent-motion extrapolation", CV_COLOR),
-    ("xu", "Xu paper baseline", "pixels-only saliency steering", XU_COLOR),
-    ("target", "GT", "future local path label", GT_COLOR),
-    ("prediction", "Ours", "visual cue-memory output", PRED_COLOR),
-]
+ALL_METHODS = {
+    "cv": ("cv", "CV baseline", "recent-motion extrapolation", CV_COLOR),
+    "xu": ("xu", "Xu paper baseline", "pixels-only saliency steering", XU_COLOR),
+    "target": ("target", "GT", "future local path label", GT_COLOR),
+    "prediction": ("prediction", "Ours", "visual cue-memory output", PRED_COLOR),
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -73,7 +73,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--position-threshold", type=float, default=5.0)
     parser.add_argument("--angle-threshold", type=float, default=10.0)
     parser.add_argument("--raw-root-base", action="append", default=[])
+    parser.add_argument("--write-branch-videos", action="store_true")
+    parser.add_argument(
+        "--methods",
+        default="cv,xu,target,prediction",
+        help="Comma-separated method keys to render. Valid keys: cv,xu,target,prediction.",
+    )
     return parser.parse_args()
+
+
+def method_specs(args: argparse.Namespace) -> list[tuple[str, str, str, tuple[int, int, int]]]:
+    keys = [key.strip() for key in str(args.methods).split(",") if key.strip()]
+    if not keys:
+        raise ValueError("--methods must include at least one method key")
+    unknown = [key for key in keys if key not in ALL_METHODS]
+    if unknown:
+        raise ValueError(f"Unsupported method keys: {unknown}. Valid keys: {sorted(ALL_METHODS)}")
+    return [ALL_METHODS[key] for key in keys]
 
 
 def source_id(sample: dict[str, Any]) -> str | None:
@@ -369,24 +385,28 @@ def render_composite_frame(
     progress: int,
     args: argparse.Namespace,
 ) -> Image.Image:
+    methods = method_specs(args)
     canvas = Image.new("RGB", (args.width, args.height), BG_COLOR)
     draw = ImageDraw.Draw(canvas)
     header = f"{order:02d}/{total:02d}  ViZDoom counterfactual / {item['label']} / {item['case']}"
     draw.text((34, 26), header, fill=TEXT_COLOR, font=font(32, bold=True))
-    metrics = (
+    metric_parts = [
         f"sample={item['sample_id']}    t={progress + 1:02d}    "
-        f"ours={item['ADE']:.2f}/{item['FDE']:.2f}    "
-        f"CV={item['cv_ADE']:.2f}/{item['cv_FDE']:.2f}    "
-        f"Xu={item['xu_ADE']:.2f}/{item['xu_FDE']:.2f}"
-    )
-    draw.text((34, 72), wrap(metrics, 145), fill=MUTED_COLOR, font=font(18))
+    ]
+    if any(key == "prediction" for key, *_ in methods):
+        metric_parts.append(f"ours={item['ADE']:.2f}/{item['FDE']:.2f}")
+    if any(key == "cv" for key, *_ in methods):
+        metric_parts.append(f"CV={item['cv_ADE']:.2f}/{item['cv_FDE']:.2f}")
+    if any(key == "xu" for key, *_ in methods):
+        metric_parts.append(f"Xu={item['xu_ADE']:.2f}/{item['xu_FDE']:.2f}")
+    draw.text((34, 72), wrap("    ".join(metric_parts), 145), fill=MUTED_COLOR, font=font(18))
     col_gap = 16
     margin_x = 34
     top = 134
-    col_w = (args.width - 2 * margin_x - 3 * col_gap) // 4
+    col_w = (args.width - 2 * margin_x - (len(methods) - 1) * col_gap) // len(methods)
     col_h = args.height - top - 34
-    max_abs = axis_scale(item["cv"], item["xu"], item["target"], item["prediction"])
-    for idx, (key, title, subtitle, color) in enumerate(METHODS):
+    max_abs = axis_scale(*(item[key] for key, *_ in methods))
+    for idx, (key, title, subtitle, color) in enumerate(methods):
         rollout = rollouts[key]
         frames = rollout["frames"]
         rgb = frames[min(progress, len(frames) - 1)] if frames else Image.new("RGB", (320, 240), (230, 234, 238))
@@ -408,38 +428,81 @@ def render_composite_frame(
     return canvas
 
 
+def render_branch_frame(
+    item: dict[str, Any],
+    rollouts: dict[str, dict[str, Any]],
+    method: tuple[str, str, str, tuple[int, int, int]],
+    order: int,
+    total: int,
+    progress: int,
+    args: argparse.Namespace,
+) -> Image.Image:
+    key, title, subtitle, color = method
+    canvas = Image.new("RGB", (args.width, args.height), BG_COLOR)
+    draw = ImageDraw.Draw(canvas)
+    header = f"{order:02d}/{total:02d}  {title} / ViZDoom / {item['label']} / {item['case']}"
+    draw.text((34, 26), header, fill=color, font=font(32, bold=True))
+    draw.text((34, 72), f"{subtitle}    sample={item['sample_id']}    t={progress + 1:02d}", fill=MUTED_COLOR, font=font(18))
+    frames = rollouts[key]["frames"]
+    rgb = frames[min(progress, len(frames) - 1)] if frames else Image.new("RGB", (320, 240), (230, 234, 238))
+    frame = fit_image(rgb, (args.width - 80, args.height - 150))
+    paste_center(canvas, frame, (40, 120, args.width - 40, args.height - 30))
+    return canvas
+
+
 def render_item_rollouts(item: dict[str, Any], raw_dirs: dict[str, Path], args: argparse.Namespace) -> dict[str, Any]:
     _raw_root, manifest, steps = load_raw_episode(item["sample"], raw_dirs)
     rollouts = {}
-    for key, _title, _subtitle, _color in METHODS:
+    for key, _title, _subtitle, _color in method_specs(args):
         rollouts[key] = rollout_method(manifest, steps, item["sample"], item[key], args)
     return {"manifest": manifest, "rollouts": rollouts}
 
 
 def write_video(rendered_items: list[dict[str, Any]], args: argparse.Namespace) -> None:
+    methods = method_specs(args)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     writer = cv2.VideoWriter(str(args.output), cv2.VideoWriter_fourcc(*"mp4v"), args.fps, (args.width, args.height))
     if not writer.isOpened():
         raise RuntimeError(f"Could not open writer: {args.output}")
+    branch_writers: dict[str, Any] = {}
+    if args.write_branch_videos:
+        for key, *_ in methods:
+            path = args.output.with_name(f"{args.output.stem}_{key}.mp4")
+            branch_writers[key] = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), args.fps, (args.width, args.height))
+            if not branch_writers[key].isOpened():
+                raise RuntimeError(f"Could not open writer: {path}")
     try:
         for order, payload in enumerate(rendered_items, start=1):
             item = payload["item"]
             rollouts = payload["rollouts"]
-            max_frames = max(len(rollouts[key]["frames"]) for key, *_ in METHODS)
+            max_frames = max(len(rollouts[key]["frames"]) for key, *_ in methods)
             last_frame = None
+            last_branch: dict[str, np.ndarray] = {}
             for progress in range(max_frames):
                 frame = render_composite_frame(item, rollouts, order, len(rendered_items), progress, args)
                 last_frame = cv2.cvtColor(np.asarray(frame), cv2.COLOR_RGB2BGR)
                 writer.write(last_frame)
+                for method in methods:
+                    key = method[0]
+                    if key in branch_writers:
+                        branch = render_branch_frame(item, rollouts, method, order, len(rendered_items), progress, args)
+                        last_branch[key] = cv2.cvtColor(np.asarray(branch), cv2.COLOR_RGB2BGR)
+                        branch_writers[key].write(last_branch[key])
             if last_frame is not None:
                 for _ in range(max(0, args.hold_last_frames)):
                     writer.write(last_frame)
+                    for key, branch_writer in branch_writers.items():
+                        if key in last_branch:
+                            branch_writer.write(last_branch[key])
     finally:
         writer.release()
+        for branch_writer in branch_writers.values():
+            branch_writer.release()
 
 
 def main() -> None:
     args = parse_args()
+    methods = method_specs(args)
     raw_dirs = load_raw_dirs(args.dataset, [ROOT, *[Path(item) for item in args.raw_root_base]])
     selected = load_selected_items(args)
     rendered = []
@@ -458,7 +521,10 @@ def main() -> None:
     manifest = {
         "output": str(args.output),
         "mode": "vizdoom_counterfactual_rollout_demo_grade",
-        "columns": [title for _key, title, _subtitle, _color in METHODS],
+        "columns": [title for _key, title, _subtitle, _color in methods],
+        "branch_videos": {
+            key: str(args.output.with_name(f"{args.output.stem}_{key}.mp4")) for key, *_ in methods if args.write_branch_videos
+        },
         "success_count": len(rendered),
         "skipped": skipped,
         "items": [
@@ -480,7 +546,7 @@ def main() -> None:
                         "frames": len(payload["rollouts"][key]["frames"]),
                         "start_info": payload["rollouts"][key]["start_info"],
                     }
-                    for key, *_ in METHODS
+                    for key, *_ in methods
                 },
             }
             for payload in rendered

@@ -10,6 +10,10 @@ Use this folder as the shortest live-demo path for slides or screen sharing.
 | `demo_triptych_moving_sequence.mp4` | 210-second 1080p moving scene walkthrough. Each selected raw episode segment is rendered frame-by-frame with three aligned panels: left = constant-velocity baseline, center = ground truth, right = model prediction. The RGB scene moves over time while each path plot progressively reveals the corresponding trajectory. |
 | `demo_paper_baseline_overlay_sequence.mp4` | 210-second 1080p recorded-scene overlay comparison. The same raw RGB future segment is shown with four trajectory panels: CV baseline, Xu-style pixels-only paper baseline, GT, and ours. |
 | `demo_vizdoom_counterfactual_rollout.mp4` | Demo-grade ViZDoom counterfactual rollout. Eight 3s ViZDoom samples are restarted from the selected pose, then CV, Xu-style paper baseline, GT, and ours are followed separately to render different first-person videos. |
+| `demo_real_counterfactual_rollout_suite.mp4` | 29-second 1080p real counterfactual rollout suite. ViZDoom, MiniWorld, and AI2-THOR are restarted from each selected sample pose, then CV, GT, and ours are followed as separate simulator branches and shown side by side. |
+| `demo_real_counterfactual_rollout_suite_cv.mp4` | Branch-only first-person suite for the CV path. |
+| `demo_real_counterfactual_rollout_suite_target.mp4` | Branch-only first-person suite for the GT path. |
+| `demo_real_counterfactual_rollout_suite_prediction.mp4` | Branch-only first-person suite for the model prediction path. |
 | `demo_triptych_sequence.mp4` | 180-second 1080p static sample-by-sample walkthrough. Each scene is rendered as three aligned panels: left = constant-velocity baseline, center = ground truth, right = model prediction. |
 
 ## Sequence

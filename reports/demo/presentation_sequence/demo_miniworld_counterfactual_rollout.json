@@ -1,0 +1,178 @@
+{
+  "output": "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout.mp4",
+  "mode": "external_real_counterfactual_rollout",
+  "columns": [
+    "CV baseline",
+    "GT",
+    "Ours"
+  ],
+  "branch_videos": {
+    "cv": "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout_cv.mp4",
+    "target": "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout_target.mp4",
+    "prediction": "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout_prediction.mp4"
+  },
+  "success_count": 2,
+  "skipped": [],
+  "items": [
+    {
+      "env_name": "MiniWorld",
+      "group": "MiniWorld-Hallway-v0",
+      "case": "hard",
+      "sample_id": "miniworld_demo_001__episode_000001_t000005",
+      "metrics": {
+        "ours_ADE": 3.6769137382507324,
+        "ours_FDE": 7.425421237945557,
+        "cv_ADE": 0.7539612650871277,
+        "cv_FDE": 1.2871811389923096
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "miniworld_set_agent_state",
+            "env_id": "MiniWorld-Hallway-v0",
+            "episode_seed": 1618529606,
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 1.7294263349762142,
+              "y": 1.5860502437457362,
+              "z": 0.0,
+              "angle": -22.969242967939433
+            },
+            "start_pose": {
+              "x": 1.7294263349762142,
+              "y": 1.5860502437457362,
+              "z": 0.0,
+              "angle": -22.969242967939433
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "miniworld_set_agent_state",
+            "env_id": "MiniWorld-Hallway-v0",
+            "episode_seed": 1618529606,
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 1.7294263349762142,
+              "y": 1.5860502437457362,
+              "z": 0.0,
+              "angle": -22.969242967939433
+            },
+            "start_pose": {
+              "x": 1.7294263349762142,
+              "y": 1.5860502437457362,
+              "z": 0.0,
+              "angle": -22.969242967939433
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "miniworld_set_agent_state",
+            "env_id": "MiniWorld-Hallway-v0",
+            "episode_seed": 1618529606,
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 1.7294263349762142,
+              "y": 1.5860502437457362,
+              "z": 0.0,
+              "angle": -22.969242967939433
+            },
+            "start_pose": {
+              "x": 1.7294263349762142,
+              "y": 1.5860502437457362,
+              "z": 0.0,
+              "angle": -22.969242967939433
+            }
+          }
+        }
+      }
+    },
+    {
+      "env_name": "MiniWorld",
+      "group": "MiniWorld-Maze-v0",
+      "case": "hard",
+      "sample_id": "miniworld_demo_001__episode_000004_t000013",
+      "metrics": {
+        "ours_ADE": 4.043692111968994,
+        "ours_FDE": 1.9628996849060059,
+        "cv_ADE": 0.0,
+        "cv_FDE": 0.0
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "miniworld_set_agent_state",
+            "env_id": "MiniWorld-Maze-v0",
+            "episode_seed": 575631305,
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 21.178615626008764,
+              "y": 0.4041543588207564,
+              "z": 0.0,
+              "angle": 109.27151894366567
+            },
+            "start_pose": {
+              "x": 21.178615626008764,
+              "y": 0.4041543588207564,
+              "z": 0.0,
+              "angle": 109.27151894366567
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "miniworld_set_agent_state",
+            "env_id": "MiniWorld-Maze-v0",
+            "episode_seed": 575631305,
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 21.178615626008764,
+              "y": 0.4041543588207564,
+              "z": 0.0,
+              "angle": 109.27151894366567
+            },
+            "start_pose": {
+              "x": 21.178615626008764,
+              "y": 0.4041543588207564,
+              "z": 0.0,
+              "angle": 109.27151894366567
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "miniworld_set_agent_state",
+            "env_id": "MiniWorld-Maze-v0",
+            "episode_seed": 575631305,
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 21.178615626008764,
+              "y": 0.4041543588207564,
+              "z": 0.0,
+              "angle": 109.27151894366567
+            },
+            "start_pose": {
+              "x": 21.178615626008764,
+              "y": 0.4041543588207564,
+              "z": 0.0,
+              "angle": 109.27151894366567
+            }
+          }
+        }
+      }
+    }
+  ]
+}

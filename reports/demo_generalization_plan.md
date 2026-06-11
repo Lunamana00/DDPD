@@ -213,16 +213,50 @@ Execution note:
 ```text
 CloudRendering worked on gpuserver3090 with a rootless libvulkan1/vulkan-tools setup.
 Do not pass --headless for visual collection because it can return metadata without RGB frames.
-ProcTHOR was smoke-tested after this, but generated houses repeatedly failed at
-CreateHouse in the current procthor==0.0.1.dev2 + ai2thor==5.0.0 environment.
-See reports/demo_external_execution_gates.md.
+ProcTHOR was completed after this using a source checkout because the old PyPI
+package mismatched the AI2-THOR 5.0 procedural material schema.
+See reports/demo_external_execution_gates.md and
+reports/demo/external_procthor_zero_shot_03s/.
 ```
 
-### 2.3 Later Candidates
+### 2.3 ProcTHOR
+
+Role:
+
+```text
+Procedurally generated Unity indoor houses.
+Good for showing that the same WIT-VZ path can run beyond fixed AI2-THOR scenes.
+```
+
+Collector:
+
+```text
+scripts/collect_procthor_wit_vz.py
+```
+
+Execution note:
+
+```text
+Use a source checkout of github.com/allenai/procthor.
+The PyPI procthor==0.0.1.dev2 package failed against AI2-THOR 5.0 because
+the generated material schema was stale.
+```
+
+Current demo result:
+
+```text
+reports/demo/external_procthor_zero_shot_03s/
+
+ProcTHOR zero-shot was run on 62 samples from 2 generated houses.
+The pipeline runs, but the ViZDoom checkpoint again fails to generalize:
+ADE 79.794 / FDE 134.560, while constant velocity is ADE 1.158 / FDE 2.288.
+This is a procedural Unity-house domain-shift limitation demo.
+```
+
+### 2.4 Later Candidates
 
 | Candidate | Use | Risk |
 |---|---|---|
-| ProcTHOR | Larger procedural AI2-THOR house diversity. | Current smoke test reaches house generation but fails at `CreateHouse`; use a pinned ProcTHOR environment. |
 | DeepMind Lab | Most game-like external environment after ViZDoom. | Requires Bazel/source build or a known working wheel/container. |
 | MineRL / MineDojo | Minecraft game data and human demonstrations. | Requires Java/headless setup and reliable pose-to-local-path conversion. |
 | Habitat-Sim | Photorealistic indoor navigation. | Requires conda/mamba or container install; more robotics than game. |
@@ -238,7 +272,8 @@ Use this order for presentation:
 3. ViZDoom 10s contact sheet: long-horizon limitation and trajectory drift.
 4. MiniWorld external zero-shot: quick cross-domain sanity check.
 5. AI2-THOR external zero-shot: object-rich Unity-domain limitation demo.
-6. ProcTHOR / DeepMind Lab / MineRL / Habitat: future expansion candidates with gates documented in reports/demo_external_execution_gates.md.
+6. ProcTHOR external zero-shot: procedural Unity-house limitation demo.
+7. DeepMind Lab / MineRL / Habitat: future expansion candidates with gates documented in reports/demo_external_execution_gates.md.
 ```
 
 Claim boundary:

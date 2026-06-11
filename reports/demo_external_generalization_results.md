@@ -8,7 +8,7 @@ This report tracks what has actually been run outside ViZDoom.
 |---|---|---|---|
 | MiniWorld | Completed | `reports/demo/external_miniworld_zero_shot_03s/` | The WIT-VZ input/output formulation transfers, but the ViZDoom checkpoint does not zero-shot generalize well. |
 | AI2-THOR | Completed | `reports/demo/external_ai2thor_zero_shot_03s/` | The WIT-VZ schema also runs on object-rich Unity indoor scenes, but the ViZDoom checkpoint fails under this domain shift. |
-| ProcTHOR | Smoke-tested but blocked | `reports/demo_external_execution_gates.md` | CloudRendering starts, but generated houses repeatedly fail at `CreateHouse`; needs a pinned ProcTHOR environment before demo use. |
+| ProcTHOR | Completed with source checkout | `reports/demo/external_procthor_zero_shot_03s/` | Source ProcTHOR runs through the same WIT-VZ path; the ViZDoom checkpoint fails even more strongly under procedural-house domain shift. |
 | DeepMind Lab | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Good game-like future extension, but requires Bazel/source build or a known working wheel/container. |
 | Habitat | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Useful robotics-style domain shift, but current server lacks conda/mamba and `habitat-sim`. |
 | MineRL / MineDojo | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Game-like, but current server lacks Java and pose-to-WIT-VZ conversion must be verified. |
@@ -184,6 +184,89 @@ ViZDoom: coordinate scale, visual appearance, and simple scripted movement make
 constant velocity much stronger than the learned visual residual.
 ```
 
+## ProcTHOR Zero-Shot Demo
+
+ProcTHOR required the source checkout rather than the old PyPI package:
+
+```bash
+git clone https://github.com/allenai/procthor.git ~/projects/external_sources/procthor
+```
+
+The old PyPI package paired poorly with AI2-THOR 5.0:
+
+```text
+procthor==0.0.1.dev2 + ai2thor==5.0.0
+CreateHouse failed with a material schema mismatch.
+```
+
+The source checkout worked with:
+
+```text
+procthor source commit: 53d5bd4
+PROCTHOR_INITIALIZATION: branch=main, scene=Procedural
+```
+
+Data collection:
+
+```bash
+python scripts/collect_procthor_wit_vz.py \
+  --out-root data/wit_vz/raw \
+  --run-id procthor_demo_001 \
+  --episodes 2 \
+  --max-steps 50 \
+  --fps 5 \
+  --width 160 \
+  --height 120 \
+  --platform CloudRendering \
+  --gpu-device 0 \
+  --procthor-source-root /home/taehyun/projects/external_sources/procthor \
+  --vulkan-library /home/taehyun/local_libs/vulkan/usr/lib/x86_64-linux-gnu/libvulkan.so.1 \
+  --overwrite
+```
+
+Processed WIT-VZ samples:
+
+```text
+dataset: data/wit_vz/processed/procthor_demo_001_03s
+episodes: 2
+frames: 100
+samples: 62
+history: 1s, 5 frames
+future: 3s, 15 waypoints
+split: episode-disjoint
+```
+
+Result on all ProcTHOR demo samples:
+
+| Model | ADE | FDE |
+|---|---:|---:|
+| ViZDoom-trained DINOv3 cue-memory checkpoint, zero-shot ProcTHOR | 79.794 | 134.560 |
+| Constant-velocity baseline | 1.158 | 2.288 |
+
+Hard-CV subset:
+
+| Model | ADE | FDE |
+|---|---:|---:|
+| ViZDoom-trained checkpoint | 75.393 | 126.362 |
+| Constant-velocity baseline | 1.936 | 3.685 |
+
+Visualization:
+
+```text
+reports/demo/external_procthor_zero_shot_03s/contact_by_house/contact_sheet.png
+reports/demo/presentation_sequence/08_procthor_external_overview.png
+```
+
+Interpretation:
+
+```text
+This is the strongest external-domain failure demo in the current package.
+The same WIT-VZ formulation runs on generated Unity houses, but the learned
+visual residual is badly miscalibrated. CV remains strong because the scripted
+rollouts are locally simple, while the ViZDoom-trained visual head overreacts
+to unfamiliar indoor colors, geometry, and scale.
+```
+
 ## Demo Claim
 
 ## Remaining External Candidates
@@ -197,10 +280,9 @@ reports/demo_external_execution_gates.md
 Short version:
 
 ```text
-ProcTHOR was the closest next candidate because it reuses AI2-THOR, but the
-current procthor==0.0.1.dev2 + ai2thor==5.0.0 setup repeatedly failed at
-CreateHouse. DeepMind Lab, Habitat-Sim, and MineRL/MineDojo require separate
-simulator environments before they can become fair WIT-VZ demos.
+ProcTHOR is now completed using a source checkout. DeepMind Lab, Habitat-Sim,
+and MineRL/MineDojo still require separate simulator environments before they
+can become fair WIT-VZ demos.
 ```
 
 Use the demos in this order:
@@ -211,6 +293,7 @@ Use the demos in this order:
 3. ViZDoom 10s long-horizon failure.
 4. MiniWorld zero-shot failure as domain-shift evidence.
 5. AI2-THOR zero-shot failure as a more object-rich Unity-domain limitation demo.
+6. ProcTHOR zero-shot failure as a procedural Unity-house limitation demo.
 ```
 
 The correct claim is:

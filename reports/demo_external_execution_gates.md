@@ -9,7 +9,7 @@ after the completed MiniWorld and AI2-THOR zero-shot demos.
 |---|---|---|---|
 | MiniWorld | Completed | `reports/demo/external_miniworld_zero_shot_03s/` | Use as a lightweight external-domain failure/sanity demo. |
 | AI2-THOR | Completed | `reports/demo/external_ai2thor_zero_shot_03s/` | Use as the object-rich Unity-domain failure/sanity demo. |
-| ProcTHOR | Smoke-tested but blocked | `HouseGenerator` starts, CloudRendering starts, but generated houses repeatedly fail at `CreateHouse`. | Do not present as a completed demo yet. Keep as next engineering item. |
+| ProcTHOR | Completed with source checkout | `reports/demo/external_procthor_zero_shot_03s/` | Use as a procedural Unity-house domain-shift failure demo. |
 | DeepMind Lab | Environment gate not satisfied | No `deepmind_lab` pip candidate in this venv check; no `bazel` installed on `gpuserver3090`. | Keep as future game-like extension. |
 | Habitat-Sim | Environment gate not satisfied | No `habitat-sim` pip candidate in this venv check; no conda/mamba installed on `gpuserver3090`. | Keep as future robotics/photorealistic extension. |
 | MineRL / MineDojo | Environment gate not satisfied | `minerl` and `minedojo` exist on PyPI, but Java is absent on `gpuserver3090`; WIT-VZ pose conversion is not direct. | Keep as future Minecraft-style extension. |
@@ -20,7 +20,7 @@ Checked on `gpuserver3090` under `/home/taehyun/projects/DDPD/.venv`.
 
 ```text
 ai2thor==5.0.0
-procthor==0.0.1.dev2
+procthor==0.0.1.dev2 (PyPI package; incompatible with AI2-THOR 5.0 procedural material schema)
 attrs==26.1.0
 pandas==2.3.3
 shapely==2.1.2
@@ -45,7 +45,7 @@ home disk: 624G free
 AI2-THOR release cache: 3.1G
 ```
 
-## ProcTHOR Smoke Test
+## ProcTHOR Smoke Test And Completed Demo
 
 ProcTHOR was selected as the next most practical candidate because it is
 compatible with AI2-THOR and should reuse the existing CloudRendering and WIT-VZ
@@ -55,6 +55,15 @@ Installed packages:
 
 ```bash
 pip install procthor attrs pandas shapely "moviepy<2" python-fcl scipy
+git clone https://github.com/allenai/procthor.git ~/projects/external_sources/procthor
+```
+
+Important finding:
+
+```text
+The PyPI procthor==0.0.1.dev2 package is too old for the current AI2-THOR 5.0
+procedural house schema. It failed with MaterialProperties JSON conversion
+errors. The source checkout at commit 53d5bd4 uses branch=main and works.
 ```
 
 Rootless rendering setup reused from the AI2-THOR demo:
@@ -92,29 +101,38 @@ house, _ = generator.sample()
 controller.step(action="CreateHouse", house=house.data)
 ```
 
-Observed result:
+Initial PyPI-package result:
 
 ```text
 seeds 1-10: AssertionError Unable to CreateHouse!
+after disabling small-object placement: CreateHouse failed with
+Newtonsoft.Json.JsonSerializationException converting string floorMaterial to
+Thor.Procedural.Data.MaterialProperties.
 ```
 
-Interpretation:
+Source-checkout result:
 
 ```text
-This is not a GPU/Vulkan failure anymore. CloudRendering starts, and the
-ProcTHOR generator reaches the procedural house creation path. The blocker is
-inside ProcTHOR/AI2-THOR procedural house compatibility. The likely issue is
-version skew between the older procthor PyPI package and the AI2-THOR 5.0
-CloudRendering build/branch used by the current environment.
+PYTHONPATH=/home/taehyun/projects/external_sources/procthor
+PROCTHOR_INITIALIZATION: branch=main, scene=Procedural
+CreateHouse: success
+Teleport to choose_agent_pose: success
+MoveAhead / RotateRight / MoveAhead: success
+RGB frame shape: [120, 160, 3]
 ```
 
-Next practical route:
+Completed WIT-VZ run:
 
 ```text
-1. Create a separate pinned ProcTHOR environment rather than reusing the current venv.
-2. Use the ProcTHOR repository's expected AI2-THOR branch/build.
-3. Verify one generated house with CreateHouse.
-4. Only then add a dedicated collect_procthor_wit_vz.py wrapper.
+collector: scripts/collect_procthor_wit_vz.py
+raw: data/wit_vz/raw/procthor_demo_001
+processed: data/wit_vz/processed/procthor_demo_001_03s
+episodes: 2
+frames: 100
+samples: 62
+zero-shot output: reports/demo/external_procthor_zero_shot_03s/
+ADE/FDE: 79.794 / 134.560
+CV ADE/FDE: 1.158 / 2.288
 ```
 
 ## DeepMind Lab Gate
@@ -213,14 +231,15 @@ Use completed demos only:
 3. ViZDoom 10s long-horizon limitation.
 4. MiniWorld external zero-shot failure.
 5. AI2-THOR external zero-shot failure.
+6. ProcTHOR external zero-shot failure.
 ```
 
 Mention the remaining candidates as future work:
 
 ```text
-ProcTHOR is the nearest next demo but currently blocked by procedural
-CreateHouse compatibility. DeepMind Lab, Habitat, and MineRL/MineDojo need
-separate simulator environments before they can become fair WIT-VZ demos.
+ProcTHOR is now completed with a source checkout. DeepMind Lab, Habitat, and
+MineRL/MineDojo need separate simulator environments before they can become
+fair WIT-VZ demos.
 ```
 
 ## Source Pointers

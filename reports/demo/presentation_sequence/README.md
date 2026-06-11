@@ -2,6 +2,12 @@
 
 Use this folder as the shortest live-demo path for slides or screen sharing.
 
+## Full Video
+
+| File | Description |
+|---|---|
+| `demo_full_sequence.mp4` | 42-second 1080p walkthrough of the full 1-11 demo sequence below. Static contact sheets are held briefly, and GIF segments retain motion. |
+
 ## Sequence
 
 | Order | File | Message |

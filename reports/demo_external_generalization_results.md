@@ -8,10 +8,10 @@ This report tracks what has actually been run outside ViZDoom.
 |---|---|---|---|
 | MiniWorld | Completed | `reports/demo/external_miniworld_zero_shot_03s/` | The WIT-VZ input/output formulation transfers, but the ViZDoom checkpoint does not zero-shot generalize well. |
 | AI2-THOR | Completed | `reports/demo/external_ai2thor_zero_shot_03s/` | The WIT-VZ schema also runs on object-rich Unity indoor scenes, but the ViZDoom checkpoint fails under this domain shift. |
-| ProcTHOR | Planned only | Uses the same AI2-THOR collector path, but was not collected in this demo pass. | Good next step for larger synthetic house diversity after the AI2-THOR smoke demo. |
-| DeepMind Lab | Planned only | Official candidate in `reports/demo_generalization_plan.md` | Good game-like future extension, heavier install/export work. |
-| Habitat | Planned only | Official candidate in `reports/demo_generalization_plan.md` | Useful robotics-style domain shift, less game-like. |
-| MineRL / MineDojo | Planned only | Candidate in `reports/demo_generalization_plan.md` | Game-like but action logs must be converted into local future path labels. |
+| ProcTHOR | Smoke-tested but blocked | `reports/demo_external_execution_gates.md` | CloudRendering starts, but generated houses repeatedly fail at `CreateHouse`; needs a pinned ProcTHOR environment before demo use. |
+| DeepMind Lab | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Good game-like future extension, but requires Bazel/source build or a known working wheel/container. |
+| Habitat | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Useful robotics-style domain shift, but current server lacks conda/mamba and `habitat-sim`. |
+| MineRL / MineDojo | Environment gate not satisfied | `reports/demo_external_execution_gates.md` | Game-like, but current server lacks Java and pose-to-WIT-VZ conversion must be verified. |
 
 ## MiniWorld Zero-Shot Demo
 
@@ -185,6 +185,23 @@ constant velocity much stronger than the learned visual residual.
 ```
 
 ## Demo Claim
+
+## Remaining External Candidates
+
+Detailed execution gates are recorded in:
+
+```text
+reports/demo_external_execution_gates.md
+```
+
+Short version:
+
+```text
+ProcTHOR was the closest next candidate because it reuses AI2-THOR, but the
+current procthor==0.0.1.dev2 + ai2thor==5.0.0 setup repeatedly failed at
+CreateHouse. DeepMind Lab, Habitat-Sim, and MineRL/MineDojo require separate
+simulator environments before they can become fair WIT-VZ demos.
+```
 
 Use the demos in this order:
 

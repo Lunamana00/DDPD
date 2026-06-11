@@ -213,16 +213,19 @@ Execution note:
 ```text
 CloudRendering worked on gpuserver3090 with a rootless libvulkan1/vulkan-tools setup.
 Do not pass --headless for visual collection because it can return metadata without RGB frames.
-ProcTHOR is still a planned extension, not collected in this pass.
+ProcTHOR was smoke-tested after this, but generated houses repeatedly failed at
+CreateHouse in the current procthor==0.0.1.dev2 + ai2thor==5.0.0 environment.
+See reports/demo_external_execution_gates.md.
 ```
 
 ### 2.3 Later Candidates
 
 | Candidate | Use | Risk |
 |---|---|---|
-| DeepMind Lab | Most game-like external environment after ViZDoom. | Heavier install and trajectory export work. |
-| MineRL / MineDojo | Minecraft game data and human demonstrations. | Converting action logs to local future path is non-trivial. |
-| Habitat-Sim | Photorealistic indoor navigation. | More robotics than game. |
+| ProcTHOR | Larger procedural AI2-THOR house diversity. | Current smoke test reaches house generation but fails at `CreateHouse`; use a pinned ProcTHOR environment. |
+| DeepMind Lab | Most game-like external environment after ViZDoom. | Requires Bazel/source build or a known working wheel/container. |
+| MineRL / MineDojo | Minecraft game data and human demonstrations. | Requires Java/headless setup and reliable pose-to-local-path conversion. |
+| Habitat-Sim | Photorealistic indoor navigation. | Requires conda/mamba or container install; more robotics than game. |
 | WorldCam-50h | Real gameplay video + camera pose. | Dataset-style extension, not a quick playable simulator demo. |
 
 ## 3. Recommended Demo Package
@@ -235,7 +238,7 @@ Use this order for presentation:
 3. ViZDoom 10s contact sheet: long-horizon limitation and trajectory drift.
 4. MiniWorld external zero-shot: quick cross-domain sanity check.
 5. AI2-THOR external zero-shot: object-rich Unity-domain limitation demo.
-6. ProcTHOR / DeepMind Lab / MineRL / Habitat: future expansion candidates.
+6. ProcTHOR / DeepMind Lab / MineRL / Habitat: future expansion candidates with gates documented in reports/demo_external_execution_gates.md.
 ```
 
 Claim boundary:

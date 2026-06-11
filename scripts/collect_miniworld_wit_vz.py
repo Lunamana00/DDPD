@@ -46,6 +46,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=951)
     parser.add_argument("--width", type=int, default=160)
     parser.add_argument("--height", type=int, default=120)
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=5.0,
+        help="Nominal sampling rate written to the WIT-VZ manifest. One MiniWorld step is treated as one frame.",
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -149,6 +155,7 @@ def collect_episode(
     max_steps: int,
     width: int,
     height: int,
+    fps: float,
     rng: random.Random,
 ) -> dict[str, Any]:
     episode_id = f"episode_{episode_index:06d}"
@@ -177,7 +184,7 @@ def collect_episode(
                 "episode_id": episode_id,
                 "step": step,
                 "global_step": step,
-                "timestamp": float(step),
+                "timestamp": float(step) / max(fps, 1e-6),
                 "frame_path": frame_rel.as_posix(),
                 "pose": pose,
                 "relative_egomotion_from_prev": egomotion,
@@ -244,6 +251,7 @@ def main() -> None:
                     args.max_steps,
                     args.width,
                     args.height,
+                    args.fps,
                     rng,
                 )
                 summaries.append(summary)
@@ -259,7 +267,7 @@ def main() -> None:
         "env_name": "miniworld",
         "scenario": "miniworld_navigation",
         "map": "multi_env",
-        "fps": 1.0,
+        "fps": args.fps,
         "frame_skip": 1,
         "episode_count": len(summaries),
         "max_steps": args.max_steps,

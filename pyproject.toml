@@ -29,6 +29,15 @@ vizdoom = [
 ai2thor = [
     "ai2thor>=5.0",
 ]
+miniworld = [
+    "gymnasium>=1.0",
+    "miniworld>=2.1",
+]
+external-demo = [
+    "ai2thor>=5.0",
+    "gymnasium>=1.0",
+    "miniworld>=2.1",
+]
 
 [dependency-groups]
 dev = [

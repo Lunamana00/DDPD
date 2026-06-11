@@ -21,6 +21,7 @@ Generated artifacts:
 reports/demo/vizdoom_multi_scenario_03s/
 reports/demo/vizdoom_multi_scenario_10s/
 reports/demo/vizdoom_hardcase_gifs_03s/
+reports/demo/presentation_sequence/
 ```
 
 Recommended presentation sequence:
@@ -111,6 +112,7 @@ uv run python scripts/collect_miniworld_wit_vz.py \
   --env-ids MiniWorld-Hallway-v0 MiniWorld-Maze-v0 MiniWorld-WallGap-v0 MiniWorld-ThreeRooms-v0 \
   --episodes-per-env 8 \
   --max-steps 240 \
+  --fps 5 \
   --overwrite
 ```
 
@@ -134,6 +136,17 @@ Evaluation modes:
 zero-shot: use the ViZDoom checkpoint directly
 adapter-tuned: freeze DINO and train only downstream/adapters on MiniWorld
 in-domain: train the full downstream predictor on MiniWorld train split
+```
+
+Current demo result:
+
+```text
+reports/demo/external_miniworld_zero_shot_03s/
+
+MiniWorld zero-shot was run on 488 samples from 4 MiniWorld envs.
+The pipeline runs, but the ViZDoom checkpoint fails to generalize:
+ADE 42.156 / FDE 71.734, while constant velocity is ADE 0.250 / FDE 0.456.
+This is a useful domain-shift limitation demo, not a success claim.
 ```
 
 ### 2.2 AI2-THOR / ProcTHOR
@@ -162,6 +175,9 @@ uv run python scripts/collect_ai2thor_wit_vz.py \
   --scenes FloorPlan1 FloorPlan2 FloorPlan201 FloorPlan301 \
   --episodes-per-scene 5 \
   --max-steps 240 \
+  --fps 5 \
+  --platform CloudRendering \
+  --headless \
   --overwrite
 ```
 
@@ -177,6 +193,17 @@ uv run python -m src.wit_vz.build_samples \
   --stride 1 \
   --split episode \
   --seed 901
+```
+
+Current execution gate:
+
+```text
+Local Windows AI2-THOR 5.0 failed because no matching Windows build was available.
+GPU server CloudRendering failed because libvulkan1 is missing.
+
+Required server setup:
+sudo apt-get update
+sudo apt-get install -y libvulkan1
 ```
 
 ### 2.3 Later Candidates

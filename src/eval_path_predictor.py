@@ -19,10 +19,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--visual-feature-cache", type=Path, default=None)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--split", default="test", choices=["train", "val", "test"])
+    parser.add_argument("--split", default="test", choices=["train", "val", "test", "all"])
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument(
+        "--backbone-override",
+        default=None,
+        help=(
+            "Override the checkpoint backbone at evaluation time. This is useful "
+            "for zero-shot external demos: a cached-DINO checkpoint can be run "
+            "with a real DINO RGB encoder when no external feature cache exists."
+        ),
+    )
+    parser.add_argument(
+        "--image-size-override",
+        type=int,
+        default=None,
+        help="Override RGB loading resolution for direct visual encoder evaluation.",
+    )
+    parser.add_argument(
+        "--ignore-checkpoint-visual-cache",
+        action="store_true",
+        help="Do not automatically reuse the checkpoint's original visual feature cache path.",
+    )
     return parser.parse_args()
 
 
@@ -38,13 +58,19 @@ def main() -> None:
     device = choose_device(args.device)
     checkpoint = torch.load(args.checkpoint, map_location=device)
     model_name = checkpoint["model_name"]
+    backbone_name = str(args.backbone_override or checkpoint.get("backbone", "small_cnn"))
     visual_feature_cache = args.visual_feature_cache
-    if visual_feature_cache is None and checkpoint.get("visual_feature_cache"):
+    if (
+        visual_feature_cache is None
+        and not args.ignore_checkpoint_visual_cache
+        and args.backbone_override is None
+        and checkpoint.get("visual_feature_cache")
+    ):
         visual_feature_cache = Path(str(checkpoint["visual_feature_cache"]))
     model = create_model(
         model_name,
         future_steps=int(checkpoint["future_steps"]),
-        backbone_name=str(checkpoint.get("backbone", "small_cnn")),
+        backbone_name=backbone_name,
         hidden_dim=int(checkpoint.get("hidden_dim", 128)),
         freeze_backbone=bool(checkpoint.get("freeze_backbone", True)),
         num_motivation_tokens=int(checkpoint.get("num_motivation_tokens", 4)),
@@ -74,7 +100,7 @@ def main() -> None:
     loader_args = SimpleNamespace(
         dataset=args.dataset,
         visual_feature_cache=visual_feature_cache,
-        image_size=int(checkpoint.get("image_size", 64)),
+        image_size=int(args.image_size_override or checkpoint.get("image_size", 64)),
         batch_size=args.batch_size,
         num_workers=args.num_workers,
         history_frame_mode=str(checkpoint.get("history_frame_mode", "full")),
@@ -83,7 +109,7 @@ def main() -> None:
     loader = make_loader(
         loader_args,
         args.split,
-        needs_rgb(model_name, str(checkpoint.get("backbone", "small_cnn"))) and visual_feature_cache is None,
+        needs_rgb(model_name, backbone_name) and visual_feature_cache is None,
     )
     metrics, predictions = evaluate_loader(
         model,
@@ -94,6 +120,9 @@ def main() -> None:
         float(checkpoint.get("multimodal_confidence_weight", 0.05)),
     )
     metrics["model"] = model_name
+    metrics["checkpoint_backbone"] = str(checkpoint.get("backbone", "small_cnn"))
+    metrics["eval_backbone"] = backbone_name
+    metrics["visual_feature_cache"] = visual_feature_cache.as_posix() if visual_feature_cache else None
     metrics["split"] = args.split
     (args.output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
     with (args.output_dir / "predictions.jsonl").open("w", encoding="utf-8") as f:

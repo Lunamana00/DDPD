@@ -35,8 +35,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=901)
     parser.add_argument("--width", type=int, default=160)
     parser.add_argument("--height", type=int, default=120)
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=5.0,
+        help="Nominal sampling rate written to the WIT-VZ manifest. One AI2-THOR action step is treated as one frame.",
+    )
     parser.add_argument("--grid-size", type=float, default=0.25)
     parser.add_argument("--rotate-step-degrees", type=float, default=45.0)
+    parser.add_argument(
+        "--platform",
+        default="auto",
+        help="AI2-THOR platform name, e.g. auto, CloudRendering, Linux64, Windows64, OSXIntel64.",
+    )
+    parser.add_argument("--headless", action="store_true", help="Pass headless=True to the AI2-THOR Controller.")
+    parser.add_argument("--x-display", default=None, help="Optional X display for Linux servers, e.g. :0.")
+    parser.add_argument("--gpu-device", type=int, default=None, help="Optional GPU index for AI2-THOR rendering.")
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -50,6 +64,19 @@ def import_ai2thor() -> Any:
             "running this collector, for example: uv pip install ai2thor"
         ) from exc
     return Controller
+
+
+def resolve_platform(name: str) -> Any:
+    if name.lower() in {"", "auto", "none"}:
+        return None
+    try:
+        import ai2thor.platform as platform_module
+    except ImportError as exc:
+        raise RuntimeError("Could not import ai2thor.platform to resolve --platform.") from exc
+    if not hasattr(platform_module, name):
+        valid = ["auto", "CloudRendering", "Linux64", "Windows64", "OSXIntel64"]
+        raise ValueError(f"Unsupported AI2-THOR platform {name!r}. Expected one of: {', '.join(valid)}")
+    return getattr(platform_module, name)
 
 
 def save_frame(frame: Any, path: Path) -> None:
@@ -91,6 +118,7 @@ def collect_episode(
     scene: str,
     episode_index: int,
     max_steps: int,
+    fps: float,
     rng: random.Random,
 ) -> dict[str, Any]:
     episode_id = f"episode_{episode_index:06d}"
@@ -113,7 +141,7 @@ def collect_episode(
                 "episode_id": episode_id,
                 "step": step,
                 "global_step": step,
-                "timestamp": float(step),
+                "timestamp": float(step) / max(fps, 1e-6),
                 "frame_path": frame_rel.as_posix(),
                 "pose": pose,
                 "relative_egomotion_from_prev": egomotion,
@@ -161,6 +189,10 @@ def main() -> None:
     controller = Controller(
         width=args.width,
         height=args.height,
+        headless=args.headless,
+        x_display=args.x_display,
+        gpu_device=args.gpu_device,
+        platform=resolve_platform(args.platform),
         gridSize=args.grid_size,
         rotateStepDegrees=args.rotate_step_degrees,
         renderDepthImage=False,
@@ -174,7 +206,7 @@ def main() -> None:
         for scene in args.scenes:
             controller.reset(scene=scene)
             for _ in range(args.episodes_per_scene):
-                summary = collect_episode(controller, run_dir, scene, episode_index, args.max_steps, rng)
+                summary = collect_episode(controller, run_dir, scene, episode_index, args.max_steps, args.fps, rng)
                 summaries.append(summary)
                 episode_index += 1
                 print(f"{summary['episode_id']}: scene={scene} steps={summary['num_steps']}")
@@ -188,7 +220,7 @@ def main() -> None:
         "env_name": "ai2thor",
         "scenario": "ithor_navigation",
         "map": "multi_scene",
-        "fps": 1.0,
+        "fps": args.fps,
         "frame_skip": 1,
         "episode_count": len(summaries),
         "max_steps": args.max_steps,

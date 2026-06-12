@@ -6,6 +6,7 @@ Use this folder as the shortest live-demo path for slides or screen sharing.
 
 | File | Description |
 |---|---|
+| `demo_final_main_with_external_05s.mp4` | Final 85-second 1440p presentation video. It starts with the main real ViZDoom five-baseline counterfactual rollout, adds a ViZDoom 5s ADE/FDE result card, then appends the external-dataset sanity section: MiniWorld and AI2-THOR real CV/GT/Ours simulator rollouts, an external zero-shot 3s metric card, and ProcTHOR, DeepMind Lab, Habitat, and MineDojo overview cards. The external section is domain-shift evidence, not a broad generalization proof. |
 | `demo_full_sequence.mp4` | 42-second 1080p walkthrough of the full 1-11 demo sequence below. Static contact sheets are held briefly, and GIF segments retain motion. |
 | `demo_triptych_moving_sequence.mp4` | 210-second 1080p moving scene walkthrough. Each selected raw episode segment is rendered frame-by-frame with three aligned panels: left = constant-velocity baseline, center = ground truth, right = model prediction. The RGB scene moves over time while each path plot progressively reveals the corresponding trajectory. |
 | `demo_paper_baseline_overlay_sequence.mp4` | 210-second 1080p recorded-scene overlay comparison. The same raw RGB future segment is shown with four trajectory panels: CV baseline, Xu-style pixels-only paper baseline, GT, and ours. |

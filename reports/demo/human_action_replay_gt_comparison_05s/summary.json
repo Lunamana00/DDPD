@@ -1,0 +1,80 @@
+{
+  "title": "Human-action replay derived GT comparison, 5s horizon",
+  "dataset": "data/wit_vz/processed/wit_vz_sauerkrautlm_human_replay_001",
+  "predictions": "reports/demo/human_action_replay_gt_comparison_05s/eval_test/predictions.jsonl",
+  "note": "GT path is derived by replaying public human action scores in ViZDoom, not by recovering original human pose trajectories.",
+  "selected": [
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000061",
+      "scenario": "defend_the_center",
+      "case": "easy",
+      "ADE": 19.547285079956055,
+      "FDE": 58.71552658081055,
+      "cv_ADE": 66.33296966552734,
+      "cv_FDE": 91.36322021484375,
+      "cv_minus_ours_ADE": 46.78568458557129,
+      "target_length": 235.64527362701125,
+      "target_curvature": 0.3941574983638773
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000009",
+      "scenario": "defend_the_center",
+      "case": "CV-hard / ours better",
+      "ADE": 161.5408172607422,
+      "FDE": 108.15129089355469,
+      "cv_ADE": 297.5273132324219,
+      "cv_FDE": 334.1039123535156,
+      "cv_minus_ours_ADE": 135.9864959716797,
+      "target_length": 771.8714760950852,
+      "target_curvature": 5.057929968039903
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000071",
+      "scenario": "defend_the_center",
+      "case": "ours worse than CV",
+      "ADE": 420.5379638671875,
+      "FDE": 669.207763671875,
+      "cv_ADE": 98.12911987304688,
+      "cv_FDE": 108.97681427001953,
+      "cv_minus_ours_ADE": -322.4088439941406,
+      "target_length": 188.11818394933002,
+      "target_curvature": 1.3264243943982357
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000008",
+      "scenario": "defend_the_center",
+      "case": "long rollout",
+      "ADE": 228.70774841308594,
+      "FDE": 220.4556884765625,
+      "cv_ADE": 338.5498046875,
+      "cv_FDE": 427.8689270019531,
+      "cv_minus_ours_ADE": 109.84205627441406,
+      "target_length": 778.020881735959,
+      "target_curvature": 5.134250433527052
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000070",
+      "scenario": "defend_the_center",
+      "case": "additional hard",
+      "ADE": 389.01226806640625,
+      "FDE": 667.8532104492188,
+      "cv_ADE": 77.98782348632812,
+      "cv_FDE": 74.39946746826172,
+      "cv_minus_ours_ADE": -311.0244445800781,
+      "target_length": 189.78291402021043,
+      "target_curvature": 1.3279881514945773
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000045",
+      "scenario": "defend_the_center",
+      "case": "additional hard",
+      "ADE": 354.2820739746094,
+      "FDE": 719.1724853515625,
+      "cv_ADE": 275.3260192871094,
+      "cv_FDE": 568.8767700195312,
+      "cv_minus_ours_ADE": -78.9560546875,
+      "target_length": 325.68613086244983,
+      "target_curvature": 3.535564188370478
+    }
+  ]
+}

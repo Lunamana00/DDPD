@@ -1,0 +1,77 @@
+{
+  "output": "reports/demo/presentation_sequence/demo_human_action_replay_gt_comparison_05s.mp4",
+  "mode": "moving_raw_episode_frames",
+  "fps": 8,
+  "hold_last_frames": 8,
+  "max_frames_per_item": 0,
+  "moving_frames": 150,
+  "missing_frame_count": 0,
+  "items": [
+    {
+      "source": "Human action replay GT 5s",
+      "label": "defend_the_center",
+      "case": "easy",
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000061",
+      "frames_rendered": 25,
+      "ADE": 19.547285079956055,
+      "FDE": 58.71552658081055,
+      "cv_ADE": 66.33296966552734,
+      "cv_FDE": 91.36322021484375
+    },
+    {
+      "source": "Human action replay GT 5s",
+      "label": "defend_the_center",
+      "case": "CV-hard / ours better",
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000009",
+      "frames_rendered": 25,
+      "ADE": 161.5408172607422,
+      "FDE": 108.15129089355469,
+      "cv_ADE": 297.5273132324219,
+      "cv_FDE": 334.1039123535156
+    },
+    {
+      "source": "Human action replay GT 5s",
+      "label": "defend_the_center",
+      "case": "ours worse than CV",
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000071",
+      "frames_rendered": 25,
+      "ADE": 420.5379638671875,
+      "FDE": 669.207763671875,
+      "cv_ADE": 98.12911987304688,
+      "cv_FDE": 108.97681427001953
+    },
+    {
+      "source": "Human action replay GT 5s",
+      "label": "defend_the_center",
+      "case": "long rollout",
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000008",
+      "frames_rendered": 25,
+      "ADE": 228.70774841308594,
+      "FDE": 220.4556884765625,
+      "cv_ADE": 338.5498046875,
+      "cv_FDE": 427.8689270019531
+    },
+    {
+      "source": "Human action replay GT 5s",
+      "label": "defend_the_center",
+      "case": "additional hard",
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000070",
+      "frames_rendered": 25,
+      "ADE": 389.01226806640625,
+      "FDE": 667.8532104492188,
+      "cv_ADE": 77.98782348632812,
+      "cv_FDE": 74.39946746826172
+    },
+    {
+      "source": "Human action replay GT 5s",
+      "label": "defend_the_center",
+      "case": "additional hard",
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000045",
+      "frames_rendered": 25,
+      "ADE": 354.2820739746094,
+      "FDE": 719.1724853515625,
+      "cv_ADE": 275.3260192871094,
+      "cv_FDE": 568.8767700195312
+    }
+  ]
+}

@@ -60,11 +60,11 @@ from render_vizdoom_counterfactual_rollouts import (  # noqa: E402
 
 
 METHODS = [
-    ("cv", "최근 움직임 기준", "과거 움직임을 그대로 이어서 이동", CV_COLOR),
-    ("pointnav", "목표점 제공 방식", "정답 마지막 위치를 미리 알고 이동", POINTNAV_COLOR),
-    ("astar", "지도 제공 방식", "이동 가능 위치와 정답 끝점을 알고 계산", ASTAR_COLOR),
-    ("target", "실제 이동 경로", "데이터에 기록된 실제 미래 이동", GT_COLOR),
-    ("prediction", "우리 모델", "화면과 움직임 기록만 보고 예측", PRED_COLOR),
+    ("cv", "CV baseline", "motion-only constant velocity; 최근 속도 외삽", CV_COLOR),
+    ("pointnav", "PointNav/DD-PPO", "Wijmans et al. 2020; GT endpoint 제공 상한선", POINTNAV_COLOR),
+    ("astar", "A* Oracle", "classical planner; pose graph + GT endpoint", ASTAR_COLOR),
+    ("target", "GT", "기록된 실제 미래 경로", GT_COLOR),
+    ("prediction", "Ours", "RGB history + ego-motion only", PRED_COLOR),
 ]
 
 CASE_LABELS = {
@@ -141,19 +141,21 @@ def render_composite_frame(
     header = f"{order:02d}/{total:02d}  실제 1인칭 환경에서의 경로 비교 / {case_label}"
     draw.text((34, 24), header, fill=TEXT_COLOR, font=font(28, bold=True))
     metrics = (
-        f"진행={progress + 1:02d}    평균/마지막 오차    "
-        f"최근 움직임 {item['cv_ADE']:.1f}/{item['cv_FDE']:.1f}    "
-        f"목표점 제공 {item['pointnav_ADE']:.1f}/{item['pointnav_FDE']:.1f}    "
-        f"지도 제공 {item['astar_ADE']:.1f}/{item['astar_FDE']:.1f}    "
-        f"우리 모델 {item['ours_ADE']:.1f}/{item['ours_FDE']:.1f}"
+        f"진행={progress + 1:02d}    ADE/FDE    "
+        f"CV {item['cv_ADE']:.1f}/{item['cv_FDE']:.1f}    "
+        f"PointNav {item['pointnav_ADE']:.1f}/{item['pointnav_FDE']:.1f}    "
+        f"A* {item['astar_ADE']:.1f}/{item['astar_FDE']:.1f}    "
+        f"Ours {item['ours_ADE']:.1f}/{item['ours_FDE']:.1f}"
     )
     draw.text((34, 62), wrap(metrics, 155), fill=MUTED_COLOR, font=font(16))
-    warning = "각 화면은 같은 시작 위치에서 따로 실행한 결과입니다. 목표점 제공 방식과 지도 제공 방식은 정답 정보를 일부 사용하므로 상한선 참고용입니다."
-    draw.text((34, 94), wrap(warning, 118), fill=(142, 82, 22), font=font(15, bold=True))
+    warning = "각 화면은 같은 시작 위치에서 따로 실행한 결과입니다. PointNav/DD-PPO와 A*는 정답 endpoint 또는 pose graph를 쓰는 privileged upper bound입니다."
+    draw.text((34, 92), wrap(warning, 124), fill=(142, 82, 22), font=font(15, bold=True))
+    source_note = "비교 용도: CV=motion-only 하한선, PointNav/DD-PPO=Wijmans et al. 2020 goal oracle, A*=map oracle upper bound, Ours=RGB+ego-motion only."
+    draw.text((34, 116), wrap(source_note, 138), fill=MUTED_COLOR, font=font(13))
 
     col_gap = 12
     margin_x = 28
-    top = 132
+    top = 156
     col_w = (args.width - 2 * margin_x - 4 * col_gap) // 5
     col_h = args.height - top - 28
     max_abs = axis_scale(*(item[key] for key, *_ in METHODS))

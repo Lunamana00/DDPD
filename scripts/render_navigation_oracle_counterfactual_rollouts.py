@@ -60,12 +60,18 @@ from render_vizdoom_counterfactual_rollouts import (  # noqa: E402
 
 
 METHODS = [
-    ("cv", "CV baseline", "recent motion only", CV_COLOR),
-    ("pointnav", "PointNav oracle", "given GT endpoint", POINTNAV_COLOR),
-    ("astar", "A* oracle", "pose graph + GT endpoint", ASTAR_COLOR),
-    ("target", "GT", "recorded future path", GT_COLOR),
-    ("prediction", "Ours", "RGB history + ego-motion", PRED_COLOR),
+    ("cv", "최근 움직임 기준", "과거 움직임을 그대로 이어서 이동", CV_COLOR),
+    ("pointnav", "목표점 제공 방식", "정답 마지막 위치를 미리 알고 이동", POINTNAV_COLOR),
+    ("astar", "지도 제공 방식", "이동 가능 위치와 정답 끝점을 알고 계산", ASTAR_COLOR),
+    ("target", "실제 이동 경로", "데이터에 기록된 실제 미래 이동", GT_COLOR),
+    ("prediction", "우리 모델", "화면과 움직임 기록만 보고 예측", PRED_COLOR),
 ]
+
+CASE_LABELS = {
+    "easy": "쉬운 사례",
+    "hard": "어려운 사례",
+    "failure": "실패 사례",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -117,7 +123,7 @@ def draw_column(
     draw.text((x + 12, y + 40), wrap(subtitle, 31), fill=MUTED_COLOR, font=font(12))
     frame = fit_image(rgb, (w - 24, 238))
     paste_center(canvas, frame, (x + 12, y + 84, x + w - 12, y + 322))
-    plot = draw_path_plot(path, (w - 24, h - 356), color, max_abs, full_path)
+    plot = draw_path_plot(path, (w - 24, h - 356), color, max_abs, full_path, axis_labels=("전방", "오른쪽"))
     canvas.paste(plot, (x + 12, y + 338))
 
 
@@ -131,18 +137,19 @@ def render_composite_frame(
 ) -> Image.Image:
     canvas = Image.new("RGB", (args.width, args.height), BG_COLOR)
     draw = ImageDraw.Draw(canvas)
-    header = f"{order:02d}/{total:02d}  Real ViZDoom counterfactual rollout / {item['label']} / {item['case']}"
+    case_label = CASE_LABELS.get(str(item["case"]), str(item["case"]))
+    header = f"{order:02d}/{total:02d}  실제 1인칭 환경에서의 경로 비교 / {case_label}"
     draw.text((34, 24), header, fill=TEXT_COLOR, font=font(28, bold=True))
     metrics = (
-        f"sample={item['sample_id']}    t={progress + 1:02d}    "
-        f"CV {item['cv_ADE']:.1f}/{item['cv_FDE']:.1f}    "
-        f"PointNav oracle {item['pointnav_ADE']:.1f}/{item['pointnav_FDE']:.1f}    "
-        f"A* oracle {item['astar_ADE']:.1f}/{item['astar_FDE']:.1f}    "
-        f"Ours {item['ours_ADE']:.1f}/{item['ours_FDE']:.1f}"
+        f"진행={progress + 1:02d}    평균/마지막 오차    "
+        f"최근 움직임 {item['cv_ADE']:.1f}/{item['cv_FDE']:.1f}    "
+        f"목표점 제공 {item['pointnav_ADE']:.1f}/{item['pointnav_FDE']:.1f}    "
+        f"지도 제공 {item['astar_ADE']:.1f}/{item['astar_FDE']:.1f}    "
+        f"우리 모델 {item['ours_ADE']:.1f}/{item['ours_FDE']:.1f}"
     )
     draw.text((34, 62), wrap(metrics, 155), fill=MUTED_COLOR, font=font(16))
-    warning = "Each column is a separate simulator branch. PointNav/A* are privileged upper bounds; Ours uses RGB history + ego-motion only."
-    draw.text((34, 96), warning, fill=(142, 82, 22), font=font(15, bold=True))
+    warning = "각 화면은 같은 시작 위치에서 따로 실행한 결과입니다. 목표점 제공 방식과 지도 제공 방식은 정답 정보를 일부 사용하므로 상한선 참고용입니다."
+    draw.text((34, 94), wrap(warning, 118), fill=(142, 82, 22), font=font(15, bold=True))
 
     col_gap = 12
     margin_x = 28
@@ -183,9 +190,10 @@ def render_branch_frame(
     key, title, subtitle, color = method
     canvas = Image.new("RGB", (args.width, args.height), BG_COLOR)
     draw = ImageDraw.Draw(canvas)
-    header = f"{order:02d}/{total:02d}  {title} / real ViZDoom branch / {item['label']} / {item['case']}"
+    case_label = CASE_LABELS.get(str(item["case"]), str(item["case"]))
+    header = f"{order:02d}/{total:02d}  {title} / 실제 1인칭 분기 실행 / {case_label}"
     draw.text((34, 26), header, fill=color, font=font(30, bold=True))
-    draw.text((34, 72), f"{subtitle}    sample={item['sample_id']}    t={progress + 1:02d}", fill=MUTED_COLOR, font=font(18))
+    draw.text((34, 72), f"{subtitle}    진행={progress + 1:02d}", fill=MUTED_COLOR, font=font(18))
     frames = rollouts[key]["frames"]
     rgb = frames[min(progress, len(frames) - 1)] if frames else Image.new("RGB", (320, 240), (230, 234, 238))
     frame = fit_image(rgb, (args.width - 80, args.height - 150))

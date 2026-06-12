@@ -201,6 +201,13 @@ def font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     candidates = [
         Path("C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf"),
         Path("C:/Windows/Fonts/segoeuib.ttf" if bold else "C:/Windows/Fonts/segoeui.ttf"),
+        Path("C:/Windows/Fonts/malgunbd.ttf" if bold else "C:/Windows/Fonts/malgun.ttf"),
+        Path.home() / ".local/share/fonts/NotoSansCJKkr-Bold.otf" if bold else Path.home() / ".local/share/fonts/NotoSansCJKkr-Regular.otf",
+        Path.home() / ".local/share/fonts/NotoSansKR-Bold.otf" if bold else Path.home() / ".local/share/fonts/NotoSansKR-Regular.otf",
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJKkr-Bold.otf" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJKkr-Regular.otf"),
+        Path("/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc"),
+        Path("/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf" if bold else "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"),
         Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
     ]
     for path in candidates:
@@ -405,6 +412,7 @@ def draw_path_plot(
     color: tuple[int, int, int],
     max_abs: float,
     full_path: list[list[float]] | None = None,
+    axis_labels: tuple[str, str] = ("forward", "right"),
 ) -> Image.Image:
     width, height = size
     image = Image.new("RGB", size, "white")
@@ -420,8 +428,8 @@ def draw_path_plot(
         draw.line((margin, y, width - margin, y), fill=GRID_COLOR, width=1)
     draw.line((cx, cy, cx, margin), fill=(35, 40, 45), width=2)
     draw.line((margin, cy, width - margin, cy), fill=(60, 65, 70), width=2)
-    draw.text((cx + 4, margin - 22), "forward", fill=TEXT_COLOR, font=font(12))
-    draw.text((width - 84, cy + 8), "right", fill=TEXT_COLOR, font=font(12))
+    draw.text((cx + 4, margin - 22), axis_labels[0], fill=TEXT_COLOR, font=font(12))
+    draw.text((width - 84, cy + 8), axis_labels[1], fill=TEXT_COLOR, font=font(12))
     full_points = [
         (cx + float(right) * scale, cy - float(forward) * scale)
         for forward, right in full_path or []

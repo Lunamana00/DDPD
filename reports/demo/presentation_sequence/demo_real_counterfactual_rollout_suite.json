@@ -1,0 +1,157 @@
+{
+  "mode": "real_counterfactual_rollout_suite",
+  "sets": {
+    "composite": {
+      "inputs": [
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_vizdoom_counterfactual_rollout_3way.mp4",
+          "frames": 138,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout.mp4",
+          "frames": 46,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_ai2thor_counterfactual_rollout.mp4",
+          "frames": 46,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        }
+      ],
+      "output": {
+        "path": "reports\\demo\\presentation_sequence\\demo_real_counterfactual_rollout_suite.mp4",
+        "frames": 230,
+        "fps": 8.0,
+        "width": 1920,
+        "height": 1080,
+        "input_paths": [
+          "reports\\demo\\presentation_sequence\\demo_vizdoom_counterfactual_rollout_3way.mp4",
+          "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout.mp4",
+          "reports\\demo\\presentation_sequence\\demo_ai2thor_counterfactual_rollout.mp4"
+        ],
+        "written_frames": 230
+      }
+    },
+    "cv": {
+      "inputs": [
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_vizdoom_counterfactual_rollout_3way_cv.mp4",
+          "frames": 138,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout_cv.mp4",
+          "frames": 46,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_ai2thor_counterfactual_rollout_cv.mp4",
+          "frames": 46,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        }
+      ],
+      "output": {
+        "path": "reports\\demo\\presentation_sequence\\demo_real_counterfactual_rollout_suite_cv.mp4",
+        "frames": 230,
+        "fps": 8.0,
+        "width": 1920,
+        "height": 1080,
+        "input_paths": [
+          "reports\\demo\\presentation_sequence\\demo_vizdoom_counterfactual_rollout_3way_cv.mp4",
+          "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout_cv.mp4",
+          "reports\\demo\\presentation_sequence\\demo_ai2thor_counterfactual_rollout_cv.mp4"
+        ],
+        "written_frames": 230
+      }
+    },
+    "target": {
+      "inputs": [
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_vizdoom_counterfactual_rollout_3way_target.mp4",
+          "frames": 138,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout_target.mp4",
+          "frames": 46,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_ai2thor_counterfactual_rollout_target.mp4",
+          "frames": 46,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        }
+      ],
+      "output": {
+        "path": "reports\\demo\\presentation_sequence\\demo_real_counterfactual_rollout_suite_target.mp4",
+        "frames": 230,
+        "fps": 8.0,
+        "width": 1920,
+        "height": 1080,
+        "input_paths": [
+          "reports\\demo\\presentation_sequence\\demo_vizdoom_counterfactual_rollout_3way_target.mp4",
+          "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout_target.mp4",
+          "reports\\demo\\presentation_sequence\\demo_ai2thor_counterfactual_rollout_target.mp4"
+        ],
+        "written_frames": 230
+      }
+    },
+    "prediction": {
+      "inputs": [
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_vizdoom_counterfactual_rollout_3way_prediction.mp4",
+          "frames": 138,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout_prediction.mp4",
+          "frames": 46,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        },
+        {
+          "path": "reports\\demo\\presentation_sequence\\demo_ai2thor_counterfactual_rollout_prediction.mp4",
+          "frames": 46,
+          "fps": 8.0,
+          "width": 1920,
+          "height": 1080
+        }
+      ],
+      "output": {
+        "path": "reports\\demo\\presentation_sequence\\demo_real_counterfactual_rollout_suite_prediction.mp4",
+        "frames": 230,
+        "fps": 8.0,
+        "width": 1920,
+        "height": 1080,
+        "input_paths": [
+          "reports\\demo\\presentation_sequence\\demo_vizdoom_counterfactual_rollout_3way_prediction.mp4",
+          "reports\\demo\\presentation_sequence\\demo_miniworld_counterfactual_rollout_prediction.mp4",
+          "reports\\demo\\presentation_sequence\\demo_ai2thor_counterfactual_rollout_prediction.mp4"
+        ],
+        "written_frames": 230
+      }
+    }
+  }
+}

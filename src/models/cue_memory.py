@@ -7,7 +7,7 @@ import math
 import torch
 from torch import nn
 
-from .backbones import build_visual_encoder
+from .backbones import ZeroVisualTokenEncoder, build_visual_encoder
 from .motion import constant_velocity_path
 
 
@@ -211,6 +211,203 @@ class LocalGridSpatialAggregator(nn.Module):
         return aggregated.reshape(batch, time, num_tokens, dim)
 
 
+class RelativeContrastHybridSpatialGraphAggregator(nn.Module):
+    """Frame-local graph attention with relative, contrast, and local-grid priors."""
+
+    def __init__(
+        self,
+        dim: int,
+        neighbors: int = 8,
+        dropout: float = 0.1,
+        use_relative_position: bool = False,
+        use_contrast: bool = False,
+        include_local_prior: bool = False,
+    ) -> None:
+        super().__init__()
+        self.neighbors = neighbors
+        self.use_relative_position = use_relative_position
+        self.use_contrast = use_contrast
+        self.include_local_prior = include_local_prior
+        self.norm = nn.LayerNorm(dim)
+        self.q = nn.Linear(dim, dim)
+        self.k = nn.Linear(dim, dim)
+        self.v = nn.Linear(dim, dim)
+        if use_relative_position:
+            rel_hidden = max(16, dim // 4)
+            self.relative_bias = nn.Sequential(
+                nn.Linear(4, rel_hidden),
+                nn.GELU(),
+                nn.Linear(rel_hidden, 1),
+            )
+        else:
+            self.relative_bias = None
+        if use_contrast:
+            contrast_dim = max(8, min(32, dim // 8))
+            contrast_hidden = max(16, dim // 4)
+            self.contrast_pair_projection = nn.Sequential(
+                nn.LayerNorm(dim),
+                nn.Linear(dim, contrast_dim),
+            )
+            self.contrast_score = nn.Sequential(
+                nn.LayerNorm(contrast_dim),
+                nn.Linear(contrast_dim, contrast_hidden),
+                nn.GELU(),
+                nn.Linear(contrast_hidden, 1),
+            )
+            self.contrast_score_chunk_size = 128
+            self.contrast_message = nn.Sequential(
+                nn.LayerNorm(contrast_dim),
+                nn.Linear(contrast_dim, contrast_hidden),
+                nn.GELU(),
+                nn.Dropout(dropout),
+                nn.Linear(contrast_hidden, contrast_dim),
+            )
+            self.contrast_up = nn.Linear(contrast_dim, dim)
+            self.contrast_message_scale = nn.Parameter(torch.tensor(1.0e-3))
+        else:
+            self.contrast_pair_projection = None
+            self.contrast_score = None
+            self.contrast_score_chunk_size = 128
+            self.contrast_message = None
+            self.contrast_up = None
+            self.contrast_message_scale = None
+        self.gate = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, dim), nn.Sigmoid())
+        self.out = nn.Sequential(nn.Linear(dim, dim), nn.Dropout(dropout))
+
+    @staticmethod
+    def _relative_features(num_tokens: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+        height, width = SpatialPositionalEncoding._grid_size(num_tokens)
+        rows = torch.arange(height, device=device, dtype=dtype).repeat_interleave(width)[:num_tokens]
+        cols = torch.arange(width, device=device, dtype=dtype).repeat(height)[:num_tokens]
+        dy = rows[None, :] - rows[:, None]
+        dx = cols[None, :] - cols[:, None]
+        dy = dy / max(height - 1, 1)
+        dx = dx / max(width - 1, 1)
+        return torch.stack([dy, dx, dy.abs(), dx.abs()], dim=-1)
+
+    def _relative_position_bias(
+        self,
+        num_tokens: int,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if self.relative_bias is None:
+            raise RuntimeError("relative position bias requested but not initialized")
+        parameter = next(self.relative_bias.parameters())
+        features = self._relative_features(num_tokens, device, parameter.dtype)
+        return self.relative_bias(features).squeeze(-1).to(dtype=dtype)
+
+    def _pairwise_contrast_bias(self, normalized: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
+        if self.contrast_pair_projection is None or self.contrast_score is None:
+            raise RuntimeError("pairwise contrast score requested but not initialized")
+        contrast_features = self.contrast_pair_projection(normalized)
+        chunk_size = max(1, self.contrast_score_chunk_size)
+        biases = []
+        for start in range(0, contrast_features.shape[0], chunk_size):
+            chunk = contrast_features[start : start + chunk_size]
+            pairwise_diff = chunk[:, None, :, :] - chunk[:, :, None, :]
+            biases.append(self.contrast_score(pairwise_diff).squeeze(-1))
+        return torch.cat(biases, dim=0).to(dtype=dtype)
+
+    def _candidate_contrast_message(
+        self,
+        normalized: torch.Tensor,
+        candidate_indices: torch.Tensor,
+        candidate_weights: torch.Tensor,
+        dtype: torch.dtype,
+    ) -> torch.Tensor:
+        if (
+            self.contrast_pair_projection is None
+            or self.contrast_message is None
+            or self.contrast_up is None
+            or self.contrast_message_scale is None
+        ):
+            raise RuntimeError("candidate contrast message requested but not initialized")
+        contrast_features = self.contrast_pair_projection(normalized)
+        batch_time, num_tokens, contrast_dim = contrast_features.shape
+        chunk_size = max(1, self.contrast_score_chunk_size)
+        messages = []
+        for start in range(0, batch_time, chunk_size):
+            end = start + chunk_size
+            chunk = contrast_features[start:end]
+            indices = candidate_indices[start:end]
+            weights = candidate_weights[start:end]
+            expanded = chunk[:, None, :, :].expand(-1, num_tokens, -1, -1)
+            gather_index = indices[..., None].expand(-1, -1, -1, contrast_dim)
+            neighbors = torch.gather(expanded, dim=2, index=gather_index)
+            center = chunk[:, :, None, :]
+            edge_messages = self.contrast_message(neighbors - center)
+            messages.append((weights[..., None] * edge_messages).sum(dim=2))
+        contrast_context = torch.cat(messages, dim=0)
+        return (self.contrast_message_scale * self.contrast_up(contrast_context)).to(dtype=dtype)
+
+    def forward(self, tokens: torch.Tensor) -> torch.Tensor:
+        # tokens: [B, T, N, D]
+        batch, time, num_tokens, dim = tokens.shape
+        if num_tokens <= 1:
+            return tokens
+        if self.neighbors <= 0 and not self.include_local_prior:
+            return tokens
+        flat = tokens.reshape(batch * time, num_tokens, dim)
+        normalized = self.norm(flat)
+        query = self.q(normalized)
+        key = self.k(normalized)
+        value = self.v(normalized)
+        scores = torch.matmul(query, key.transpose(1, 2)) / math.sqrt(dim)
+
+        if self.use_relative_position:
+            rel_bias = self._relative_position_bias(num_tokens, tokens.device, scores.dtype)
+            scores = scores + rel_bias[None, :, :]
+
+        if self.use_contrast:
+            if (
+                self.contrast_pair_projection is None
+                or self.contrast_score is None
+                or self.contrast_message is None
+                or self.contrast_up is None
+                or self.contrast_message_scale is None
+            ):
+                raise RuntimeError("contrast-aware graph requested but not initialized")
+            scores = scores + self._pairwise_contrast_bias(normalized, scores.dtype)
+
+        eye = torch.eye(num_tokens, device=tokens.device, dtype=torch.bool)[None, :, :]
+        scores = scores.masked_fill(eye, torch.finfo(scores.dtype).min)
+        neighbor_count = min(max(self.neighbors, 0), num_tokens - 1)
+        candidate_mask = None
+        if neighbor_count > 0:
+            top_indices = torch.topk(scores, k=neighbor_count, dim=-1).indices
+            candidate_mask = torch.zeros_like(scores, dtype=torch.bool)
+            candidate_mask.scatter_(2, top_indices, True)
+        if self.include_local_prior:
+            local_mask = LocalGridSpatialAggregator._local_neighbor_mask(num_tokens, tokens.device)[None, :, :]
+            candidate_mask = local_mask if candidate_mask is None else candidate_mask | local_mask
+        if candidate_mask is None:
+            return tokens
+
+        candidate_mask = candidate_mask.expand_as(scores)
+        max_candidates = int(candidate_mask.sum(dim=-1).max().detach().cpu().item())
+        if max_candidates <= 0:
+            return tokens
+        masked_scores = scores.masked_fill(~candidate_mask, torch.finfo(scores.dtype).min)
+        candidate_scores, candidate_indices = torch.topk(masked_scores, k=max_candidates, dim=-1)
+        valid_candidates = torch.gather(candidate_mask, dim=2, index=candidate_indices)
+        candidate_weights = torch.softmax(candidate_scores, dim=-1).masked_fill(~valid_candidates, 0.0)
+        expanded_value = value[:, None, :, :].expand(-1, num_tokens, -1, -1)
+        gather_index = candidate_indices[..., None].expand(-1, -1, -1, dim)
+        selected_values = torch.gather(expanded_value, dim=2, index=gather_index)
+        context = (candidate_weights[..., None] * selected_values).sum(dim=2)
+        if self.use_contrast:
+            context = context + self._candidate_contrast_message(
+                normalized,
+                candidate_indices,
+                candidate_weights,
+                context.dtype,
+            )
+        gate = self.gate(torch.cat([normalized, context], dim=-1))
+        aggregated = flat + self.out(gate * context)
+        return aggregated.reshape(batch, time, num_tokens, dim)
+
+
 def build_spatial_relation_module(
     relation_type: str,
     dim: int,
@@ -218,14 +415,54 @@ def build_spatial_relation_module(
     dropout: float = 0.1,
 ) -> nn.Module:
     normalized = relation_type.lower()
-    if normalized == "none":
+    if normalized in {"none", "identity"}:
         return nn.Identity()
-    if normalized == "topk_graph":
+    if normalized in {"topk_graph", "dynamic_graph"}:
         return DynamicSpatialGraphAggregator(dim, neighbors, dropout=dropout)
-    if normalized == "full_attention":
+    if normalized in {"full_attention", "full"}:
         return FullSpatialAttentionAggregator(dim, dropout=dropout)
-    if normalized == "local_grid":
+    if normalized in {"local_grid", "local"}:
         return LocalGridSpatialAggregator(dim, dropout=dropout)
+    if normalized == "strnet_edge_message":
+        return EdgeMessageDynamicSpatialGraphAggregator(dim, neighbors, dropout=dropout)
+    if normalized in {"relpos_topk_graph", "relative_topk_graph", "relative_position_topk_graph"}:
+        return RelativeContrastHybridSpatialGraphAggregator(
+            dim,
+            neighbors,
+            dropout=dropout,
+            use_relative_position=True,
+        )
+    if normalized in {"contrast_topk_graph", "contrast_graph"}:
+        return RelativeContrastHybridSpatialGraphAggregator(
+            dim,
+            neighbors,
+            dropout=dropout,
+            use_contrast=True,
+        )
+    if normalized in {"hybrid_local_topk_graph", "hybrid_graph", "local_topk_graph"}:
+        return RelativeContrastHybridSpatialGraphAggregator(
+            dim,
+            neighbors,
+            dropout=dropout,
+            include_local_prior=True,
+        )
+    if normalized in {"relpos_contrast_hybrid_graph", "relative_contrast_hybrid_graph"}:
+        return RelativeContrastHybridSpatialGraphAggregator(
+            dim,
+            neighbors,
+            dropout=dropout,
+            use_relative_position=True,
+            use_contrast=True,
+            include_local_prior=True,
+        )
+    if normalized in {"relpos_contrast_topk_graph", "relative_contrast_topk_graph"}:
+        return RelativeContrastHybridSpatialGraphAggregator(
+            dim,
+            neighbors,
+            dropout=dropout,
+            use_relative_position=True,
+            use_contrast=True,
+        )
     raise ValueError(f"Unknown spatial_relation_type: {relation_type}")
 
 
@@ -449,11 +686,13 @@ class TemporalAdapter(nn.Module):
         spatial_graph_neighbors: int = 8,
     ) -> None:
         super().__init__()
-        self.temporal_type = temporal_type
+        self.temporal_type = temporal_type.lower()
         self.position = TemporalPositionalEncoding(dim)
         self.temporal_shift = TemporalShift(dim) if use_temporal_shift else nn.Identity()
         self.difference_conv = TemporalDifferenceConv(dim, dropout=dropout) if use_difference_conv else nn.Identity()
-        if temporal_type == "transformer":
+        if self.temporal_type in {"none", "identity"}:
+            self.module = nn.Identity()
+        elif self.temporal_type == "transformer":
             layer = nn.TransformerEncoderLayer(
                 d_model=dim,
                 nhead=heads,
@@ -463,13 +702,13 @@ class TemporalAdapter(nn.Module):
                 activation="gelu",
             )
             self.module = nn.TransformerEncoder(layer, num_layers=layers)
-        elif temporal_type == "gru":
+        elif self.temporal_type == "gru":
             self.module = nn.GRU(dim, dim, num_layers=layers, batch_first=True)
-        elif temporal_type == "timesformer":
+        elif self.temporal_type == "timesformer":
             self.module = nn.ModuleList(
                 [DividedSpaceTimeBlock(dim, heads=heads, dropout=dropout) for _ in range(layers)]
             )
-        elif temporal_type == "strnet":
+        elif self.temporal_type == "strnet":
             self.module = nn.ModuleList(
                 [
                     STRNetFusionBlock(dim, neighbors=spatial_graph_neighbors, dropout=dropout)
@@ -487,6 +726,8 @@ class TemporalAdapter(nn.Module):
 
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:
         # tokens: [B, T, N, D]
+        if self.temporal_type in {"none", "identity"}:
+            return tokens
         batch, time, num_tokens, dim = tokens.shape
         positioned = self.position(tokens)
         per_spatial_token = positioned.permute(0, 2, 1, 3).reshape(batch * num_tokens, time, dim)
@@ -739,10 +980,11 @@ def build_cue_selector(
 
 
 class CueMemoryBank(nn.Module):
-    def __init__(self, dim: int, num_slots: int, ego_dim: int = 3) -> None:
+    def __init__(self, dim: int, num_slots: int, ego_dim: int = 3, use_ego: bool = True) -> None:
         super().__init__()
+        self.use_ego = use_ego
         self.initial_memory = nn.Parameter(torch.zeros(num_slots, dim))
-        self.ego_mlp = nn.Sequential(nn.Linear(ego_dim, dim), nn.GELU(), nn.Linear(dim, dim))
+        self.ego_mlp = nn.Sequential(nn.Linear(ego_dim, dim), nn.GELU(), nn.Linear(dim, dim)) if use_ego else None
         self.gru_cell = nn.GRUCell(dim, dim)
         self.norm = nn.LayerNorm(dim)
 
@@ -751,7 +993,12 @@ class CueMemoryBank(nn.Module):
         batch, time, num_slots, dim = cues_over_time.shape
         memory = self.initial_memory[None, :, :].expand(batch, -1, -1)
         for t in range(time):
-            ego = self.ego_mlp(ego_history[:, t, :])[:, None, :]
+            if self.use_ego:
+                if self.ego_mlp is None:
+                    raise RuntimeError("ego_mlp is required when use_ego=True")
+                ego = self.ego_mlp(ego_history[:, t, :])[:, None, :]
+            else:
+                ego = cues_over_time.new_zeros(batch, 1, dim)
             update_input = cues_over_time[:, t, :, :] + ego
             flat_in = update_input.reshape(batch * num_slots, dim)
             flat_memory = memory.reshape(batch * num_slots, dim)
@@ -760,13 +1007,50 @@ class CueMemoryBank(nn.Module):
         return memory
 
 
+class LastCueMemoryBank(nn.Module):
+    """No learned memory update: expose only the latest selected cue tokens."""
+
+    def forward(self, cues_over_time: torch.Tensor, ego_history: torch.Tensor) -> torch.Tensor:
+        del ego_history
+        return cues_over_time[:, -1, :, :]
+
+
+class MeanCueMemoryBank(nn.Module):
+    """No learned memory update: average selected cue tokens over time."""
+
+    def forward(self, cues_over_time: torch.Tensor, ego_history: torch.Tensor) -> torch.Tensor:
+        del ego_history
+        return cues_over_time.mean(dim=1)
+
+
+class StaticMemoryBank(nn.Module):
+    """Trainable memory slots with cue writes disabled."""
+
+    def __init__(self, dim: int, num_slots: int) -> None:
+        super().__init__()
+        self.initial_memory = nn.Parameter(torch.zeros(num_slots, dim))
+
+    def forward(self, cues_over_time: torch.Tensor, ego_history: torch.Tensor) -> torch.Tensor:
+        del ego_history
+        batch = cues_over_time.shape[0]
+        return self.initial_memory[None, :, :].expand(batch, -1, -1)
+
+
 class AttentionCueMemoryBank(nn.Module):
     """Content-addressed cue memory with attention writes over memory slots."""
 
-    def __init__(self, dim: int, num_slots: int, ego_dim: int = 3, dropout: float = 0.1) -> None:
+    def __init__(
+        self,
+        dim: int,
+        num_slots: int,
+        ego_dim: int = 3,
+        dropout: float = 0.1,
+        use_ego: bool = True,
+    ) -> None:
         super().__init__()
+        self.use_ego = use_ego
         self.initial_memory = nn.Parameter(torch.zeros(num_slots, dim))
-        self.ego_mlp = nn.Sequential(nn.Linear(ego_dim, dim), nn.GELU(), nn.Linear(dim, dim))
+        self.ego_mlp = nn.Sequential(nn.Linear(ego_dim, dim), nn.GELU(), nn.Linear(dim, dim)) if use_ego else None
         self.cue_projection = nn.Sequential(
             nn.LayerNorm(dim),
             nn.Linear(dim, dim),
@@ -789,7 +1073,12 @@ class AttentionCueMemoryBank(nn.Module):
         batch, time, _num_cues, dim = cues_over_time.shape
         memory = self.initial_memory[None, :, :].expand(batch, -1, -1)
         for t in range(time):
-            ego = self.ego_mlp(ego_history[:, t, :])[:, None, :]
+            if self.use_ego:
+                if self.ego_mlp is None:
+                    raise RuntimeError("ego_mlp is required when use_ego=True")
+                ego = self.ego_mlp(ego_history[:, t, :])[:, None, :]
+            else:
+                ego = cues_over_time.new_zeros(batch, 1, dim)
             cues = self.cue_projection(cues_over_time[:, t, :, :] + ego)
             scores = torch.matmul(cues, self.norm(memory).transpose(1, 2)) / math.sqrt(dim)
             write_weights = torch.softmax(scores, dim=-1)
@@ -811,9 +1100,104 @@ def build_cue_memory_bank(
     normalized = memory_type.lower()
     if normalized in {"gru_cell", "gru", "recurrent"}:
         return CueMemoryBank(dim, num_slots)
+    if normalized in {"gru_no_ego", "recurrent_no_ego"}:
+        return CueMemoryBank(dim, num_slots, use_ego=False)
     if normalized in {"attention", "memory_network", "content_addressed"}:
         return AttentionCueMemoryBank(dim, num_slots, dropout=dropout)
+    if normalized in {"attention_no_ego", "no_ego_attention", "content_addressed_no_ego"}:
+        return AttentionCueMemoryBank(dim, num_slots, dropout=dropout, use_ego=False)
+    if normalized in {"last_cue", "last", "no_memory"}:
+        return LastCueMemoryBank()
+    if normalized in {"mean_cue", "mean", "temporal_mean"}:
+        return MeanCueMemoryBank()
+    if normalized in {"no_memory_update", "static_memory", "frozen_memory_slots"}:
+        return StaticMemoryBank(dim, num_slots)
     raise ValueError(f"Unknown memory_type: {memory_type}")
+
+
+class EpisodicCueLongMemoryBank(nn.Module):
+    """Across-window cue memory updated once per prediction window.
+
+    This module is intentionally separate from ``AttentionCueMemoryBank``. The
+    existing cue memory summarizes the frames inside one 1-second sample, while
+    this bank carries state across consecutive samples from the same episode.
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_slots: int,
+        ego_dim: int = 3,
+        dropout: float = 0.1,
+        use_ego: bool = True,
+        memory_type: str = "gated_attention",
+    ) -> None:
+        super().__init__()
+        normalized = memory_type.lower()
+        if normalized in {"attention_no_ego", "gated_attention_no_ego", "no_ego"}:
+            use_ego = False
+            normalized = "gated_attention"
+        if normalized not in {"attention", "gated_attention", "gated_forget"}:
+            raise ValueError(f"Unsupported episodic long memory type: {memory_type}")
+        self.memory_type = normalized
+        self.use_ego = use_ego
+        self.initial_memory = nn.Parameter(torch.zeros(num_slots, dim))
+        self.ego_mlp = nn.Sequential(nn.Linear(ego_dim, dim), nn.GELU(), nn.Linear(dim, dim)) if use_ego else None
+        self.cue_projection = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim, dim),
+        )
+        self.query = nn.Linear(dim, dim)
+        self.key = nn.Linear(dim, dim)
+        self.value = nn.Linear(dim, dim)
+        self.write_gate = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, dim), nn.Sigmoid())
+        self.write_candidate = nn.Sequential(
+            nn.LayerNorm(dim * 2),
+            nn.Linear(dim * 2, dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim, dim),
+        )
+        self.forget_gate = nn.Sequential(nn.LayerNorm(dim * 2), nn.Linear(dim * 2, dim), nn.Sigmoid())
+        self.dropout = nn.Dropout(dropout)
+        self.norm = nn.LayerNorm(dim)
+
+    def initial_state(self, batch_size: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+        return self.initial_memory.to(device=device, dtype=dtype)[None, :, :].expand(batch_size, -1, -1)
+
+    def forward(
+        self,
+        memory: torch.Tensor,
+        short_memory: torch.Tensor,
+        ego_history: torch.Tensor,
+    ) -> torch.Tensor:
+        # memory: [B, M, D], short_memory: [B, K, D], ego_history: [B, T, 3]
+        batch, _slots, dim = memory.shape
+        if self.use_ego:
+            if self.ego_mlp is None:
+                raise RuntimeError("ego_mlp is required when use_ego=True")
+            ego = self.ego_mlp(ego_history.sum(dim=1))[:, None, :]
+        else:
+            ego = short_memory.new_zeros(batch, 1, dim)
+        cues = self.cue_projection(short_memory + ego)
+        query = self.query(self.norm(memory))
+        key = self.key(cues)
+        value = self.value(cues)
+        scores = torch.matmul(query, key.transpose(1, 2)) / math.sqrt(dim)
+        weights = torch.softmax(scores, dim=-1)
+        context = torch.matmul(weights, value)
+        if self.memory_type == "attention":
+            return self.norm(memory + self.dropout(context))
+        write_input = torch.cat([memory, context], dim=-1)
+        candidate = self.write_candidate(write_input)
+        write = self.write_gate(write_input)
+        if self.memory_type == "gated_forget":
+            forget = self.forget_gate(write_input)
+            return self.norm(forget * memory + write * candidate)
+        return self.norm(memory + write * (candidate - memory))
 
 
 class PathQueryDecoder(nn.Module):
@@ -826,11 +1210,14 @@ class PathQueryDecoder(nn.Module):
         num_modes: int = 1,
         dropout: float = 0.1,
         zero_init_output: bool = False,
+        shared_horizon_query: bool = False,
     ) -> None:
         super().__init__()
         self.future_steps = future_steps
         self.num_modes = num_modes
-        self.horizon_queries = nn.Parameter(torch.randn(future_steps, dim) * 0.02)
+        self.shared_horizon_query = shared_horizon_query
+        num_horizon_queries = 1 if shared_horizon_query else future_steps
+        self.horizon_queries = nn.Parameter(torch.randn(num_horizon_queries, dim) * 0.02)
         self.mode_queries = (
             nn.Parameter(torch.randn(num_modes, dim) * 0.02) if num_modes > 1 else None
         )
@@ -862,10 +1249,13 @@ class PathQueryDecoder(nn.Module):
 
     def forward(self, memory: torch.Tensor) -> torch.Tensor | dict[str, torch.Tensor]:
         batch = memory.shape[0]
+        horizon_queries = self.horizon_queries
+        if self.shared_horizon_query:
+            horizon_queries = horizon_queries.expand(self.future_steps, -1)
         if self.num_modes == 1:
-            query = self.horizon_queries[None, :, :].expand(batch, -1, -1)
+            query = horizon_queries[None, :, :].expand(batch, -1, -1)
         else:
-            query = self.horizon_queries[None, :, :] + self.mode_queries[:, None, :]
+            query = horizon_queries[None, :, :] + self.mode_queries[:, None, :]
             query = query.reshape(self.num_modes * self.future_steps, -1)
             query = query[None, :, :].expand(batch, -1, -1)
         for layer in self.layers:
@@ -878,6 +1268,130 @@ class PathQueryDecoder(nn.Module):
         paths = self.head(query)
         logits = self.mode_score_head(query.mean(dim=2)).squeeze(-1)
         return {"paths": paths, "logits": logits}
+
+
+class SingleVectorMLPDecoder(nn.Module):
+    """Decode the full future path from one pooled memory vector."""
+
+    def __init__(
+        self,
+        dim: int,
+        future_steps: int,
+        num_modes: int = 1,
+        dropout: float = 0.1,
+        zero_init_output: bool = False,
+    ) -> None:
+        super().__init__()
+        self.future_steps = future_steps
+        self.num_modes = num_modes
+        self.path_head = nn.Sequential(
+            nn.LayerNorm(dim),
+            nn.Linear(dim, dim * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(dim * 4, future_steps * num_modes * 2),
+        )
+        self.mode_score_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_modes))
+        if zero_init_output:
+            nn.init.zeros_(self.path_head[-1].weight)
+            nn.init.zeros_(self.path_head[-1].bias)
+        nn.init.zeros_(self.mode_score_head[-1].weight)
+        nn.init.zeros_(self.mode_score_head[-1].bias)
+
+    def forward(self, memory: torch.Tensor) -> torch.Tensor | dict[str, torch.Tensor]:
+        pooled = memory.mean(dim=1)
+        paths = self.path_head(pooled)
+        if self.num_modes == 1:
+            return paths.view(memory.shape[0], self.future_steps, 2)
+        paths = paths.view(memory.shape[0], self.num_modes, self.future_steps, 2)
+        return {"paths": paths, "logits": self.mode_score_head(pooled)}
+
+
+class AutoregressivePathDecoder(nn.Module):
+    """Decode future steps sequentially from previous predicted offsets."""
+
+    def __init__(
+        self,
+        dim: int,
+        future_steps: int,
+        dropout: float = 0.1,
+        zero_init_output: bool = False,
+    ) -> None:
+        super().__init__()
+        self.future_steps = future_steps
+        self.context = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, dim), nn.GELU())
+        self.previous_step = nn.Linear(2, dim)
+        self.cell = nn.GRUCell(dim, dim)
+        self.dropout = nn.Dropout(dropout)
+        self.head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, 2))
+        if zero_init_output:
+            nn.init.zeros_(self.head[-1].weight)
+            nn.init.zeros_(self.head[-1].bias)
+
+    def forward(self, memory: torch.Tensor) -> torch.Tensor:
+        batch = memory.shape[0]
+        context = self.context(memory.mean(dim=1))
+        hidden = context
+        previous = memory.new_zeros(batch, 2)
+        outputs = []
+        for _step in range(self.future_steps):
+            step_input = context + self.previous_step(previous)
+            hidden = self.cell(self.dropout(step_input), hidden)
+            previous = self.head(hidden)
+            outputs.append(previous)
+        return torch.stack(outputs, dim=1)
+
+
+def build_path_decoder(
+    decoder_type: str,
+    dim: int,
+    future_steps: int,
+    heads: int = 4,
+    layers: int = 1,
+    num_modes: int = 1,
+    dropout: float = 0.1,
+    zero_init_output: bool = False,
+) -> nn.Module:
+    normalized = decoder_type.lower()
+    if normalized in {"horizon_query", "horizon_query_decoder", "path_query"}:
+        return PathQueryDecoder(
+            dim,
+            future_steps,
+            heads=heads,
+            layers=layers,
+            num_modes=num_modes,
+            dropout=dropout,
+            zero_init_output=zero_init_output,
+        )
+    if normalized in {"shared_query", "shared_query_decoder"}:
+        return PathQueryDecoder(
+            dim,
+            future_steps,
+            heads=heads,
+            layers=layers,
+            num_modes=num_modes,
+            dropout=dropout,
+            zero_init_output=zero_init_output,
+            shared_horizon_query=True,
+        )
+    if normalized in {"single_vector", "single_vector_mlp", "single_vector_direct", "mlp"}:
+        return SingleVectorMLPDecoder(
+            dim,
+            future_steps,
+            num_modes=num_modes,
+            dropout=dropout,
+            zero_init_output=zero_init_output,
+        )
+    if normalized in {"autoregressive", "autoregressive_decoder", "ar"}:
+        if num_modes != 1:
+            raise ValueError("autoregressive_decoder currently supports num_modes=1 only")
+        return AutoregressivePathDecoder(
+            dim,
+            future_steps,
+            dropout=dropout,
+            zero_init_output=zero_init_output,
+        )
+    raise ValueError(f"Unknown decoder_type: {decoder_type}")
 
 
 class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
@@ -902,6 +1416,7 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
         use_temporal_difference_conv: bool = False,
         use_temporal_shift: bool = False,
         decoder_layers: int = 1,
+        decoder_type: str = "horizon_query_decoder",
         cue_temporal_layers: int = 1,
         dropout: float = 0.1,
         use_constant_velocity_residual: bool = True,
@@ -910,6 +1425,7 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
     ) -> None:
         super().__init__()
         self.future_steps = future_steps
+        self.decoder_type = decoder_type
         self.use_constant_velocity_residual = use_constant_velocity_residual
         self.register_buffer("residual_scale", torch.tensor(float(residual_scale)), persistent=True)
         self.visual_encoder = build_visual_encoder(backbone_name, hidden_dim, freeze_backbone)
@@ -959,7 +1475,8 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             dropout=dropout,
         )
         self.memory = build_cue_memory_bank(memory_type, hidden_dim, num_cue_tokens, dropout=dropout)
-        self.decoder = PathQueryDecoder(
+        self.decoder = build_path_decoder(
+            decoder_type,
             hidden_dim,
             future_steps,
             layers=decoder_layers,
@@ -968,9 +1485,15 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             zero_init_output=use_constant_velocity_residual,
         )
 
-    def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor | dict[str, torch.Tensor]:
+    def encode_memory(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         if "visual_tokens" in batch:
             tokens = batch["visual_tokens"].float()
+        elif isinstance(self.visual_encoder, ZeroVisualTokenEncoder) and "rgb_history" not in batch:
+            ego_history = batch["ego_history"]
+            batch_size, time = ego_history.shape[:2]
+            tokens = ego_history.new_zeros(
+                (batch_size, time, self.visual_encoder.token_count, self.visual_encoder.out_dim)
+            )
         else:
             tokens = self.visual_encoder(batch["rgb_history"])
         tokens = self.input_projection(tokens)
@@ -983,12 +1506,194 @@ class TwoStreamEgocentricCueMemoryPathPredictor(nn.Module):
             cues.append(self.selector(tokens[:, t, :, :]))
         cues_over_time = torch.stack(cues, dim=1)
         cues_over_time = self.cue_temporal(cues_over_time)
-        memory = self.memory(cues_over_time, batch["ego_history"])
+        return self.memory(cues_over_time, batch["ego_history"])
+
+    def decode_memory(
+        self,
+        memory: torch.Tensor,
+        ego_history: torch.Tensor,
+    ) -> torch.Tensor | dict[str, torch.Tensor]:
         decoded = self.decoder(memory)
         if not self.use_constant_velocity_residual:
             return decoded
-        base = constant_velocity_path(batch["ego_history"], self.future_steps)
+        base = constant_velocity_path(ego_history, self.future_steps)
         if isinstance(decoded, dict):
             paths = base[:, None, :, :] + decoded["paths"] * self.residual_scale.to(decoded["paths"].dtype)
             return {"paths": paths, "logits": decoded["logits"]}
         return base + decoded * self.residual_scale.to(decoded.dtype)
+
+    def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor | dict[str, torch.Tensor]:
+        memory = self.encode_memory(batch)
+        return self.decode_memory(memory, batch["ego_history"])
+
+
+class EpisodicLongTermCueMemoryPathPredictor(nn.Module):
+    """Path predictor with memory carried across consecutive WIT-VZ windows."""
+
+    def __init__(
+        self,
+        future_steps: int,
+        backbone_name: str = "small_cnn",
+        hidden_dim: int = 128,
+        freeze_backbone: bool = True,
+        use_bottleneck_adapters: bool = True,
+        adapter_bottleneck_dim: int = 64,
+        temporal_type: str = "transformer",
+        temporal_layers: int = 1,
+        num_cue_tokens: int = 8,
+        selector_layers: int = 1,
+        selector_type: str = "query_attention",
+        tokenlearner_pooling: str = "sigmoid",
+        memory_type: str = "attention",
+        use_spatial_graph: bool = False,
+        spatial_graph_neighbors: int = 8,
+        spatial_relation_type: str | None = None,
+        use_temporal_difference_conv: bool = False,
+        use_temporal_shift: bool = False,
+        decoder_layers: int = 1,
+        decoder_type: str = "horizon_query_decoder",
+        cue_temporal_layers: int = 1,
+        dropout: float = 0.1,
+        use_constant_velocity_residual: bool = True,
+        residual_scale: float = 1.0,
+        num_modes: int = 1,
+        long_memory_type: str = "gated_attention",
+        long_memory_slots: int | None = None,
+        long_memory_use_ego: bool = True,
+        detach_long_memory: bool = True,
+    ) -> None:
+        super().__init__()
+        self.short_model = TwoStreamEgocentricCueMemoryPathPredictor(
+            future_steps=future_steps,
+            backbone_name=backbone_name,
+            hidden_dim=hidden_dim,
+            freeze_backbone=freeze_backbone,
+            use_bottleneck_adapters=use_bottleneck_adapters,
+            adapter_bottleneck_dim=adapter_bottleneck_dim,
+            temporal_type=temporal_type,
+            temporal_layers=temporal_layers,
+            num_cue_tokens=num_cue_tokens,
+            selector_layers=selector_layers,
+            selector_type=selector_type,
+            tokenlearner_pooling=tokenlearner_pooling,
+            memory_type=memory_type,
+            use_spatial_graph=use_spatial_graph,
+            spatial_graph_neighbors=spatial_graph_neighbors,
+            spatial_relation_type=spatial_relation_type,
+            use_temporal_difference_conv=use_temporal_difference_conv,
+            use_temporal_shift=use_temporal_shift,
+            decoder_layers=decoder_layers,
+            decoder_type=decoder_type,
+            cue_temporal_layers=cue_temporal_layers,
+            dropout=dropout,
+            use_constant_velocity_residual=use_constant_velocity_residual,
+            residual_scale=residual_scale,
+            num_modes=num_modes,
+        )
+        self.long_memory_type = long_memory_type.lower()
+        self.long_memory_slots = int(long_memory_slots or num_cue_tokens)
+        self.detach_long_memory = detach_long_memory
+        if self.long_memory_type == "none":
+            self.long_memory_bank = None
+        elif self.long_memory_type in {"mean", "mean_memory", "running_mean"}:
+            if self.long_memory_slots != num_cue_tokens:
+                raise ValueError("mean long memory requires long_memory_slots == num_cue_tokens")
+            self.long_memory_bank = None
+        else:
+            self.long_memory_bank = EpisodicCueLongMemoryBank(
+                hidden_dim,
+                self.long_memory_slots,
+                dropout=dropout,
+                use_ego=long_memory_use_ego,
+                memory_type=self.long_memory_type,
+            )
+
+    @property
+    def future_steps(self) -> int:
+        return self.short_model.future_steps
+
+    def _slice_window_batch(
+        self,
+        batch: dict[str, torch.Tensor],
+        index: int,
+    ) -> dict[str, torch.Tensor]:
+        window: dict[str, torch.Tensor] = {
+            "ego_history": batch["ego_history"][:, index, :, :],
+        }
+        if "visual_tokens" in batch:
+            window["visual_tokens"] = batch["visual_tokens"][:, index, :, :, :]
+        if "rgb_history" in batch:
+            window["rgb_history"] = batch["rgb_history"][:, index, :, :, :, :]
+        return window
+
+    def _initial_long_memory(
+        self,
+        short_memory: torch.Tensor,
+    ) -> torch.Tensor:
+        batch_size = short_memory.shape[0]
+        if self.long_memory_bank is not None:
+            return self.long_memory_bank.initial_state(batch_size, short_memory.device, short_memory.dtype)
+        return short_memory.new_zeros(batch_size, self.long_memory_slots, short_memory.shape[-1])
+
+    @staticmethod
+    def _append_prediction(
+        outputs: list[torch.Tensor] | dict[str, list[torch.Tensor]],
+        pred: torch.Tensor | dict[str, torch.Tensor],
+    ) -> list[torch.Tensor] | dict[str, list[torch.Tensor]]:
+        if isinstance(pred, dict):
+            if not isinstance(outputs, dict):
+                outputs = {"paths": [], "logits": []}
+            outputs["paths"].append(pred["paths"])
+            outputs["logits"].append(pred["logits"])
+            return outputs
+        if isinstance(outputs, dict):
+            raise RuntimeError("Cannot mix tensor and dict episodic predictions")
+        outputs.append(pred)
+        return outputs
+
+    @staticmethod
+    def _stack_predictions(
+        outputs: list[torch.Tensor] | dict[str, list[torch.Tensor]],
+    ) -> torch.Tensor | dict[str, torch.Tensor]:
+        if isinstance(outputs, dict):
+            return {
+                "paths": torch.stack(outputs["paths"], dim=1),
+                "logits": torch.stack(outputs["logits"], dim=1),
+            }
+        return torch.stack(outputs, dim=1)
+
+    def _update_long_memory(
+        self,
+        long_memory: torch.Tensor,
+        short_memory: torch.Tensor,
+        ego_history: torch.Tensor,
+        step: int,
+    ) -> torch.Tensor:
+        if self.long_memory_type == "none":
+            return long_memory
+        if self.long_memory_type in {"mean", "mean_memory", "running_mean"}:
+            if step == 0:
+                updated = short_memory
+            else:
+                updated = (long_memory * step + short_memory) / float(step + 1)
+            return updated.detach() if self.detach_long_memory else updated
+        if self.long_memory_bank is None:
+            raise RuntimeError("long_memory_bank is required for learned episodic memory")
+        updated = self.long_memory_bank(long_memory, short_memory, ego_history)
+        return updated.detach() if self.detach_long_memory else updated
+
+    def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor | dict[str, torch.Tensor]:
+        # chunk tensors: [B, L, ...]
+        chunk_length = batch["ego_history"].shape[1]
+        outputs: list[torch.Tensor] | dict[str, list[torch.Tensor]] = []
+        long_memory: torch.Tensor | None = None
+        for step in range(chunk_length):
+            window = self._slice_window_batch(batch, step)
+            short_memory = self.short_model.encode_memory(window)
+            if long_memory is None:
+                long_memory = self._initial_long_memory(short_memory)
+            read_memory = short_memory if self.long_memory_type == "none" else torch.cat([short_memory, long_memory], dim=1)
+            pred = self.short_model.decode_memory(read_memory, window["ego_history"])
+            outputs = self._append_prediction(outputs, pred)
+            long_memory = self._update_long_memory(long_memory, short_memory, window["ego_history"], step)
+        return self._stack_predictions(outputs)

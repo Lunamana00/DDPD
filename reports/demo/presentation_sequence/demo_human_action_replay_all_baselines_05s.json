@@ -1,0 +1,111 @@
+{
+  "output": "reports/demo/presentation_sequence/demo_human_action_replay_all_baselines_05s.mp4",
+  "poster": "reports/demo/presentation_sequence/demo_human_action_replay_all_baselines_05s.png",
+  "mode": "human_replay_all_baselines_recorded_scene_overlay",
+  "columns": [
+    "CV",
+    "Xu-style",
+    "Khaleque",
+    "PointNav",
+    "A*",
+    "GT",
+    "Ours"
+  ],
+  "fps": 8,
+  "moving_frames": 150,
+  "missing_frame_count": 0,
+  "metrics": {
+    "constant_velocity": {
+      "ADE": 161.91148418419368,
+      "FDE": 280.41777088805384
+    },
+    "xu_pixels_only": {
+      "ADE": 186.95635693983894,
+      "FDE": 335.50761582698766
+    },
+    "khaleque_exploratory": {
+      "ADE": 306.035002731773,
+      "FDE": 486.2066631932263
+    },
+    "pointnav_goal_oracle": {
+      "ADE": 73.72618425074796,
+      "FDE": 0.0
+    },
+    "astar_oracle": {
+      "ADE": 69.09868018200244,
+      "FDE": 8.042620687428168e-06
+    },
+    "ours": {
+      "ADE": 147.87197718024254,
+      "FDE": 259.02148681879044
+    }
+  },
+  "items": [
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000061",
+      "case": "easy",
+      "frames_rendered": 25,
+      "cv_ADE": 66.33297012861235,
+      "xu_ADE": 178.58855643511976,
+      "khaleque_ADE": 157.5291154382085,
+      "pointnav_ADE": 30.3765278425686,
+      "astar_ADE": 28.862852754577972,
+      "ours_ADE": 19.547285079956055
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000009",
+      "case": "CV-hard / ours better",
+      "frames_rendered": 25,
+      "cv_ADE": 297.52730648826315,
+      "xu_ADE": 294.04842133833483,
+      "khaleque_ADE": 343.2076086640594,
+      "pointnav_ADE": 127.22156997774593,
+      "astar_ADE": 101.31082043101756,
+      "ours_ADE": 161.5408172607422
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000071",
+      "case": "ours worse than CV",
+      "frames_rendered": 25,
+      "cv_ADE": 98.12912789536676,
+      "xu_ADE": 174.4062451706985,
+      "khaleque_ADE": 143.28131180275787,
+      "pointnav_ADE": 45.60859011820477,
+      "astar_ADE": 44.992744601121885,
+      "ours_ADE": 420.5379638671875
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000008",
+      "case": "long rollout",
+      "frames_rendered": 25,
+      "cv_ADE": 338.54982307143604,
+      "xu_ADE": 335.707373555846,
+      "khaleque_ADE": 439.6154027736863,
+      "pointnav_ADE": 121.75628608112962,
+      "astar_ADE": 93.04933598062715,
+      "ours_ADE": 228.70774841308594
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000070",
+      "case": "additional hard",
+      "frames_rendered": 25,
+      "cv_ADE": 77.98782376861854,
+      "xu_ADE": 170.71458944429986,
+      "khaleque_ADE": 185.65102310078137,
+      "pointnav_ADE": 42.96193978840779,
+      "astar_ADE": 42.189417244678545,
+      "ours_ADE": 389.01226806640625
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000045",
+      "case": "additional hard",
+      "frames_rendered": 25,
+      "cv_ADE": 275.3260146005679,
+      "xu_ADE": 258.6878471240203,
+      "khaleque_ADE": 186.71831285186272,
+      "pointnav_ADE": 22.34735169312791,
+      "astar_ADE": 19.660819240546708,
+      "ours_ADE": 354.2820739746094
+    }
+  ]
+}

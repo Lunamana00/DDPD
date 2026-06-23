@@ -1,0 +1,50 @@
+{
+  "video": "reports/demo/presentation_sequence/demo_main_5baseline_multiscenario_05s.mp4",
+  "gt_boundary": {
+    "human_action_replay": "Human action labels are replayed in ViZDoom to derive the GT path.",
+    "v4_multi_scenario": "GT is the recorded WIT-VZ ViZDoom trajectory, not human-play GT."
+  },
+  "baseline_boundary": "PointNav and A* are privileged upper bounds using the GT endpoint.",
+  "blocks": {
+    "human_action_replay": {
+      "name": "human_action_replay",
+      "samples": 64,
+      "constant_velocity": {
+        "ADE": 161.91148418419368,
+        "FDE": 280.4177708880538
+      },
+      "pointnav_goal_oracle": {
+        "ADE": 73.72618425074795,
+        "FDE": 0.0
+      },
+      "astar_oracle": {
+        "ADE": 69.09868018200247,
+        "FDE": 8.042620687428167e-06
+      },
+      "ours": {
+        "ADE": 147.8719796084582,
+        "FDE": 259.02148710860746
+      }
+    },
+    "v4_multi_scenario": {
+      "name": "v4_multi_scenario",
+      "samples": 9448,
+      "constant_velocity": {
+        "ADE": 119.34799700135099,
+        "FDE": 217.37822398308674
+      },
+      "pointnav_goal_oracle": {
+        "ADE": 50.26273101338585,
+        "FDE": 0.0
+      },
+      "astar_oracle": {
+        "ADE": 50.94994935981305,
+        "FDE": 0.0
+      },
+      "ours": {
+        "ADE": 93.31883624900104,
+        "FDE": 164.83595580783035
+      }
+    }
+  }
+}

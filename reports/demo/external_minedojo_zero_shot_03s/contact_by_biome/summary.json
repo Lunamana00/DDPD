@@ -1,0 +1,32 @@
+[
+  {
+    "group": "plains",
+    "case": "easy",
+    "sample_id": "minedojo_demo_001__episode_000001_t000031",
+    "ADE": 80.92745971679688,
+    "FDE": 144.93736267089844,
+    "constant_velocity_ADE": 0.07954366505146027,
+    "constant_velocity_FDE": 0.10654697567224503,
+    "image": "plains/easy_01.png"
+  },
+  {
+    "group": "plains",
+    "case": "hard",
+    "sample_id": "minedojo_demo_001__episode_000001_t000004",
+    "ADE": 49.066890716552734,
+    "FDE": 76.91300964355469,
+    "constant_velocity_ADE": 0.27011072635650635,
+    "constant_velocity_FDE": 0.5757412910461426,
+    "image": "plains/hard_02.png"
+  },
+  {
+    "group": "plains",
+    "case": "failure",
+    "sample_id": "minedojo_demo_001__episode_000001_t000007",
+    "ADE": 125.0098876953125,
+    "FDE": 216.03187561035156,
+    "constant_velocity_ADE": 0.3596422076225281,
+    "constant_velocity_FDE": 0.5574027895927429,
+    "image": "plains/failure_03.png"
+  }
+]

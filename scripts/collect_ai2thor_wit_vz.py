@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import ctypes.util
 import json
+import os
 import random
 import shutil
 import sys
@@ -35,8 +37,44 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=901)
     parser.add_argument("--width", type=int, default=160)
     parser.add_argument("--height", type=int, default=120)
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=5.0,
+        help="Nominal sampling rate written to the WIT-VZ manifest. One AI2-THOR action step is treated as one frame.",
+    )
     parser.add_argument("--grid-size", type=float, default=0.25)
-    parser.add_argument("--rotate-step-degrees", type=float, default=45.0)
+    parser.add_argument(
+        "--rotate-step-degrees",
+        type=float,
+        default=90.0,
+        help="AI2-THOR grid rotation step. Keep the default 90 when snapToGrid is enabled.",
+    )
+    parser.add_argument(
+        "--platform",
+        default="auto",
+        help="AI2-THOR platform name, e.g. auto, CloudRendering, Linux64, Windows64, OSXIntel64.",
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help=(
+            "Pass headless=True to the AI2-THOR Controller. Use this only for "
+            "metadata checks: in AI2-THOR 5.0 it can suppress RGB frames, so "
+            "CloudRendering visual collection should normally omit this flag."
+        ),
+    )
+    parser.add_argument("--x-display", default=None, help="Optional X display for Linux servers, e.g. :0.")
+    parser.add_argument("--gpu-device", type=int, default=None, help="Optional GPU index for AI2-THOR rendering.")
+    parser.add_argument(
+        "--vulkan-library",
+        type=Path,
+        default=None,
+        help=(
+            "Optional libvulkan.so path for rootless CloudRendering setups. "
+            "This patches AI2-THOR's ctypes.util.find_library validation."
+        ),
+    )
     parser.add_argument("--overwrite", action="store_true")
     return parser.parse_args()
 
@@ -52,7 +90,45 @@ def import_ai2thor() -> Any:
     return Controller
 
 
+def resolve_platform(name: str) -> Any:
+    if name.lower() in {"", "auto", "none"}:
+        return None
+    try:
+        import ai2thor.platform as platform_module
+    except ImportError as exc:
+        raise RuntimeError("Could not import ai2thor.platform to resolve --platform.") from exc
+    if not hasattr(platform_module, name):
+        valid = ["auto", "CloudRendering", "Linux64", "Windows64", "OSXIntel64"]
+        raise ValueError(f"Unsupported AI2-THOR platform {name!r}. Expected one of: {', '.join(valid)}")
+    return getattr(platform_module, name)
+
+
+def patch_vulkan_find_library(vulkan_library: Path | None) -> None:
+    if vulkan_library is None:
+        return
+    resolved = vulkan_library.expanduser().resolve()
+    if not resolved.exists():
+        raise FileNotFoundError(f"Requested --vulkan-library does not exist: {resolved}")
+    original_find_library = ctypes.util.find_library
+
+    def find_library_with_vulkan(name: str) -> str | None:
+        if name == "vulkan":
+            return str(resolved)
+        return original_find_library(name)
+
+    ctypes.util.find_library = find_library_with_vulkan
+    lib_dir = str(resolved.parent)
+    current = os.environ.get("LD_LIBRARY_PATH", "")
+    if lib_dir not in current.split(":"):
+        os.environ["LD_LIBRARY_PATH"] = f"{lib_dir}:{current}" if current else lib_dir
+
+
 def save_frame(frame: Any, path: Path) -> None:
+    if frame is None:
+        raise RuntimeError(
+            "AI2-THOR returned no RGB frame. If you used --headless, rerun without it; "
+            "for GPU-server visual collection prefer --platform CloudRendering without --headless."
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(frame).save(path)
 
@@ -91,6 +167,7 @@ def collect_episode(
     scene: str,
     episode_index: int,
     max_steps: int,
+    fps: float,
     rng: random.Random,
 ) -> dict[str, Any]:
     episode_id = f"episode_{episode_index:06d}"
@@ -113,7 +190,7 @@ def collect_episode(
                 "episode_id": episode_id,
                 "step": step,
                 "global_step": step,
-                "timestamp": float(step),
+                "timestamp": float(step) / max(fps, 1e-6),
                 "frame_path": frame_rel.as_posix(),
                 "pose": pose,
                 "relative_egomotion_from_prev": egomotion,
@@ -157,10 +234,15 @@ def main() -> None:
         shutil.rmtree(run_dir)
     run_dir.mkdir(parents=True, exist_ok=True)
 
+    patch_vulkan_find_library(args.vulkan_library)
     Controller = import_ai2thor()
     controller = Controller(
         width=args.width,
         height=args.height,
+        headless=args.headless,
+        x_display=args.x_display,
+        gpu_device=args.gpu_device,
+        platform=resolve_platform(args.platform),
         gridSize=args.grid_size,
         rotateStepDegrees=args.rotate_step_degrees,
         renderDepthImage=False,
@@ -174,7 +256,7 @@ def main() -> None:
         for scene in args.scenes:
             controller.reset(scene=scene)
             for _ in range(args.episodes_per_scene):
-                summary = collect_episode(controller, run_dir, scene, episode_index, args.max_steps, rng)
+                summary = collect_episode(controller, run_dir, scene, episode_index, args.max_steps, args.fps, rng)
                 summaries.append(summary)
                 episode_index += 1
                 print(f"{summary['episode_id']}: scene={scene} steps={summary['num_steps']}")
@@ -188,7 +270,7 @@ def main() -> None:
         "env_name": "ai2thor",
         "scenario": "ithor_navigation",
         "map": "multi_scene",
-        "fps": 1.0,
+        "fps": args.fps,
         "frame_skip": 1,
         "episode_count": len(summaries),
         "max_steps": args.max_steps,

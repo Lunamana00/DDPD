@@ -1,0 +1,338 @@
+# External Demo Execution Gates
+
+This report records the current execution state of the external demo candidates
+after the completed MiniWorld, AI2-THOR, ProcTHOR, DeepMind Lab, Habitat-Sim,
+and MineDojo zero-shot demos.
+
+## Current Status
+
+| Candidate | Status | Evidence | Demo Decision |
+|---|---|---|---|
+| MiniWorld | Completed | `reports/demo/external_miniworld_zero_shot_03s/` | Use as a lightweight external-domain failure/sanity demo. |
+| AI2-THOR | Completed | `reports/demo/external_ai2thor_zero_shot_03s/` | Use as the object-rich Unity-domain failure/sanity demo. |
+| ProcTHOR | Completed with source checkout | `reports/demo/external_procthor_zero_shot_03s/` | Use as a procedural Unity-house domain-shift failure demo. |
+| DeepMind Lab | Completed with source build | `reports/demo/external_deepmind_lab_zero_shot_03s/` | Use as the small game-like external-domain positive sanity case. |
+| Habitat-Sim | Completed with micromamba env | `reports/demo/external_habitat_zero_shot_03s/` | Use as the photorealistic embodied-navigation domain-shift failure demo. |
+| MineDojo | Completed with micromamba env and Malmo dependency patch | `reports/demo/external_minedojo_zero_shot_03s/` | Use as a Minecraft-style formulation gate and domain-shift failure demo. |
+| MineRL human/demo data | Not executed | Standard MineRL observations still need a reliable pose-label route for ADE/FDE. | Keep as future dataset-style extension. |
+
+## Server State
+
+Checked on `gpuserver3090` under `/home/taehyun/projects/DDPD/.venv`.
+
+```text
+ai2thor==5.0.0
+procthor==0.0.1.dev2 (PyPI package; incompatible with AI2-THOR 5.0 procedural material schema)
+attrs==26.1.0
+pandas==2.3.3
+shapely==2.1.2
+python-fcl==0.7.0.11
+scipy==1.15.3
+moviepy==1.0.3
+minerl: not-installed in the DDPD venv
+minedojo: installed in /home/taehyun/projects/minedojo_env
+habitat-sim: installed in /home/taehyun/projects/habitat_env
+deepmind_lab: installed in separate /home/taehyun/projects/dmlab_env
+```
+
+System tools:
+
+```text
+xvfb-run: available
+git/gcc/g++: available
+bazel: installed user-space through Bazelisk at ~/bin/bazel
+micromamba: installed user-space at ~/bin/micromamba
+java: available in /home/taehyun/projects/minedojo_env through openjdk 8.0.472
+home disk: 624G free
+AI2-THOR release cache: 3.1G
+```
+
+## ProcTHOR Smoke Test And Completed Demo
+
+ProcTHOR was selected as the next most practical candidate because it is
+compatible with AI2-THOR and should reuse the existing CloudRendering and WIT-VZ
+collection path.
+
+Installed packages:
+
+```bash
+pip install procthor attrs pandas shapely "moviepy<2" python-fcl scipy
+git clone https://github.com/allenai/procthor.git ~/projects/external_sources/procthor
+```
+
+Important finding:
+
+```text
+The PyPI procthor==0.0.1.dev2 package is too old for the current AI2-THOR 5.0
+procedural house schema. It failed with MaterialProperties JSON conversion
+errors. The source checkout at commit 53d5bd4 uses branch=main and works.
+```
+
+Rootless rendering setup reused from the AI2-THOR demo:
+
+```bash
+PATH=$HOME/local_libs/vulkan-tools/usr/bin:$PATH
+LD_LIBRARY_PATH=$HOME/local_libs/vulkan/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH
+```
+
+Smoke-test structure:
+
+```python
+from ai2thor.controller import Controller
+from ai2thor.platform import CloudRendering
+from procthor.constants import PROCTHOR_INITIALIZATION
+from procthor.generation import HouseGenerator
+from procthor.generation.room_specs import PROCTHOR10K_ROOM_SPEC_SAMPLER
+
+controller = Controller(
+    width=160,
+    height=120,
+    platform=CloudRendering,
+    gpu_device=0,
+    quality="Low",
+    **PROCTHOR_INITIALIZATION,
+)
+
+generator = HouseGenerator(
+    split="train",
+    seed=seed,
+    controller=controller,
+    room_spec_sampler=PROCTHOR10K_ROOM_SPEC_SAMPLER,
+)
+house, _ = generator.sample()
+controller.step(action="CreateHouse", house=house.data)
+```
+
+Initial PyPI-package result:
+
+```text
+seeds 1-10: AssertionError Unable to CreateHouse!
+after disabling small-object placement: CreateHouse failed with
+Newtonsoft.Json.JsonSerializationException converting string floorMaterial to
+Thor.Procedural.Data.MaterialProperties.
+```
+
+Source-checkout result:
+
+```text
+PYTHONPATH=/home/taehyun/projects/external_sources/procthor
+PROCTHOR_INITIALIZATION: branch=main, scene=Procedural
+CreateHouse: success
+Teleport to choose_agent_pose: success
+MoveAhead / RotateRight / MoveAhead: success
+RGB frame shape: [120, 160, 3]
+```
+
+Completed WIT-VZ run:
+
+```text
+collector: scripts/collect_procthor_wit_vz.py
+raw: data/wit_vz/raw/procthor_demo_001
+processed: data/wit_vz/processed/procthor_demo_001_03s
+episodes: 2
+frames: 100
+samples: 62
+zero-shot output: reports/demo/external_procthor_zero_shot_03s/
+ADE/FDE: 79.794 / 134.560
+CV ADE/FDE: 1.158 / 2.288
+```
+
+## DeepMind Lab Source Build And Completed Demo
+
+Why it is still useful:
+
+```text
+DeepMind Lab is the most game-like candidate after ViZDoom: first-person 3D
+levels, navigation tasks, RGB observations, and action-based movement.
+```
+
+Build route:
+
+```text
+Bazelisk installed at ~/bin/bazel
+DeepMind Lab source checkout: ~/projects/external_sources/deepmind_lab
+source commit: b1db91a
+Bazel version used: 6.5.0
+local user-space dev packages: SDL2, OSMesa, libffi, gettext
+wheel: /tmp/dmlab_pkg/deepmind_lab-1.0-py3-none-any.whl
+runtime venv: ~/projects/dmlab_env with numpy<2, dm_env, six, pillow
+```
+
+Important build notes:
+
+```text
+1. Bazel 9 failed because the upstream WORKSPACE/BUILD files are not bzlmod-ready.
+2. Bazel 6.5.0 worked after pinning Abseil to 20230125.3.
+3. The source tree needed user-space SDL2/OSMesa/libffi/gettext dev packages
+   because sudo apt install is not available.
+4. The DDPD venv has NumPy 2.2.6, but the DMLab native module needs NumPy 1.x
+   ABI compatibility, so collection runs in a separate venv.
+5. DeepMind Lab exposes RGB plus `DEBUG.POS.TRANS` and `DEBUG.POS.ROT`, so
+   WIT-VZ future local path labels can be built without velocity integration.
+```
+
+Smoke-test result:
+
+```text
+level: nav_maze_static_01
+observations: RGB_INTERLEAVED, DEBUG.POS.TRANS, DEBUG.POS.ROT, VEL.TRANS, VEL.ROT
+RGB shape: [120, 160, 3]
+step: success
+```
+
+Completed WIT-VZ run:
+
+```text
+collector: scripts/collect_deepmind_lab_wit_vz.py
+raw: data/wit_vz/raw/deepmind_lab_demo_001
+processed: data/wit_vz/processed/deepmind_lab_demo_001_03s
+levels: nav_maze_static_01, nav_maze_random_goal_01, seekavoid_arena_01, lt_chasm
+episodes: 4
+frames: 200
+samples: 124
+zero-shot output: reports/demo/external_deepmind_lab_zero_shot_03s/
+ADE/FDE: 155.288 / 239.752
+CV ADE/FDE: 180.822 / 306.231
+```
+
+## Habitat-Sim Completed Demo
+
+Why it is still useful:
+
+```text
+Habitat is less game-like, but it is a strong photorealistic embodied-navigation
+domain-shift candidate with RGB, agent pose, and standard trajectory APIs.
+```
+
+Environment route:
+
+```text
+micromamba env: /home/taehyun/projects/habitat_env
+package: habitat-sim 0.3.3, headless, Python 3.9
+test data: habitat_test_scenes downloaded to /home/taehyun/projects/habitat_data
+scene: skokloster-castle.glb
+```
+
+Smoke-test result:
+
+```text
+RGB observation shape: [120, 160, 4]
+agent state position: available
+agent state rotation: available
+step(move_forward): success
+```
+
+Completed WIT-VZ run:
+
+```text
+collector: scripts/collect_habitat_wit_vz.py
+raw: data/wit_vz/raw/habitat_demo_001
+processed: data/wit_vz/processed/habitat_demo_001_03s
+episodes: 4
+frames: 200
+samples: 124
+zero-shot output: reports/demo/external_habitat_zero_shot_03s/
+ADE/FDE: 44.765 / 74.896
+CV ADE/FDE: 0.571 / 1.080
+```
+
+## MineDojo Completed Demo
+
+Why it is still useful:
+
+```text
+Minecraft is game-like and visually very different from ViZDoom. It would be a
+strong stress test for broad visual-domain generalization.
+```
+
+Environment route:
+
+```text
+micromamba env: /home/taehyun/projects/minedojo_env
+Python: 3.9
+Java: OpenJDK 8.0.472
+package: minedojo 0.1
+headless wrapper: xvfb-run
+```
+
+Compatibility fixes:
+
+```text
+1. gym==0.21.0 required older pip/setuptools/wheel behavior.
+2. MineDojo required numpy<2 because it still references removed NumPy aliases.
+3. Malmo's Gradle dependency com.github.SpongePowered:MixinGradle:dcfaf61 no
+   longer resolved from the original remote repositories, so the jar from
+   github.com/verityw/MixinGradle-dcfaf61 was installed into the local Maven
+   cache and buildscript repositories were patched with mavenLocal().
+```
+
+Pose-label result:
+
+```text
+MineDojo reset/step exposes:
+- rgb: [3, H, W]
+- location_stats.pos: [x, y, z]
+- location_stats.yaw / pitch
+
+The collector converts Minecraft coordinates to WIT-VZ coordinates with:
+world-x := minecraft z
+world-y := minecraft x
+angle := -minecraft yaw
+```
+
+Completed WIT-VZ run:
+
+```text
+collector: scripts/collect_minedojo_wit_vz.py
+raw: data/wit_vz/raw/minedojo_demo_001
+processed: data/wit_vz/processed/minedojo_demo_001_03s
+biome: plains
+episodes: 1
+frames: 50
+samples: 31
+zero-shot output: reports/demo/external_minedojo_zero_shot_03s/
+ADE/FDE: 89.338 / 161.605
+CV ADE/FDE: 0.447 / 0.837
+```
+
+Limitation:
+
+```text
+Additional biome launches were too slow on the shared server, so this is a
+small formulation gate and a domain-gap failure case. It should not be
+presented as Minecraft generalization.
+```
+
+## Presentation Recommendation
+
+Use completed demos only:
+
+```text
+1. ViZDoom in-domain diversity.
+2. ViZDoom hard-case GIFs.
+3. ViZDoom 10s long-horizon limitation.
+4. MiniWorld external zero-shot failure.
+5. AI2-THOR external zero-shot failure.
+6. ProcTHOR external zero-shot failure.
+7. DeepMind Lab external zero-shot positive sanity case.
+8. Habitat-Sim external zero-shot failure.
+9. MineDojo external zero-shot formulation gate and failure.
+```
+
+Mention the remaining candidates as future work:
+
+```text
+ProcTHOR, DeepMind Lab, and Habitat are now completed with source-checkout,
+source-build, or micromamba routes. MineDojo is also completed as a small
+Minecraft-style gate. MineRL human/demo data remains future work because
+ADE/FDE requires reliable pose labels, not RGB video alone.
+```
+
+## Source Pointers
+
+- ProcTHOR repository: https://github.com/allenai/procthor
+- AI2-THOR CloudRendering docs: https://ai2thor.allenai.org/ithor/documentation/
+- DeepMind Lab repository: https://github.com/google-deepmind/lab
+- Habitat-Sim repository: https://github.com/facebookresearch/habitat-sim
+- MineRL first-agent docs: https://minerl.readthedocs.io/en/latest/tutorials/first_agent.html
+- MineDojo repository: https://github.com/MineDojo/MineDojo

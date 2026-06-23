@@ -1,0 +1,935 @@
+{
+  "output": "reports/demo/presentation_sequence/demo_vizdoom_counterfactual_rollout.mp4",
+  "mode": "vizdoom_counterfactual_rollout_demo_grade",
+  "columns": [
+    "CV baseline",
+    "Xu paper baseline",
+    "GT",
+    "Ours"
+  ],
+  "success_count": 8,
+  "skipped": [
+    {
+      "sample_id": "wit_vz_v4_default_basic_001__episode_000038_t000056",
+      "reason": "RuntimeError('could not align start pose: pos_error=29.36, angle_error=1.76, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_my_way_home_001__episode_000037_t000136",
+      "reason": "RuntimeError('could not align start pose: pos_error=33.24, angle_error=0.91, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_my_way_home_001__episode_000025_t000190",
+      "reason": "RuntimeError('could not align start pose: pos_error=22.63, angle_error=1.27, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_my_way_home_001__episode_000037_t000190",
+      "reason": "RuntimeError('could not align start pose: pos_error=17.80, angle_error=1.60, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_health_gathering_001__episode_000007_t000065",
+      "reason": "RuntimeError('could not align start pose: pos_error=10.66, angle_error=0.00, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_health_gathering_001__episode_000037_t000021",
+      "reason": "RuntimeError('could not align start pose: pos_error=71.37, angle_error=0.00, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_health_gathering_001__episode_000004_t000127",
+      "reason": "RuntimeError('could not align start pose: pos_error=7.22, angle_error=3.52, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_health_gathering_supreme_001__episode_000033_t000021",
+      "reason": "RuntimeError('could not align start pose: pos_error=16.28, angle_error=3.33, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_health_gathering_supreme_001__episode_000020_t000042",
+      "reason": "RuntimeError('could not align start pose: pos_error=11.44, angle_error=3.03, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_health_gathering_supreme_001__episode_000020_t000016",
+      "reason": "RuntimeError('could not align start pose: pos_error=10.43, angle_error=2.56, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_defend_the_center_001__episode_000002_t000016",
+      "reason": "RuntimeError('could not align start pose: pos_error=67.75, angle_error=3.52, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_defend_the_line_001__episode_000004_t000043",
+      "reason": "RuntimeError('could not align start pose: pos_error=14.30, angle_error=0.00, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_defend_the_line_001__episode_000032_t000017",
+      "reason": "RuntimeError('could not align start pose: pos_error=52.76, angle_error=1.76, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_predict_position_001__episode_000032_t000049",
+      "reason": "RuntimeError('could not align start pose: pos_error=7.30, angle_error=1.76, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_predict_position_001__episode_000029_t000133",
+      "reason": "RuntimeError('could not align start pose: pos_error=9.11, angle_error=0.00, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_predict_position_001__episode_000030_t000017",
+      "reason": "RuntimeError('could not align start pose: pos_error=10.05, angle_error=1.76, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_deathmatch_001__episode_000026_t000083",
+      "reason": "RuntimeError('could not align start pose: pos_error=21.75, angle_error=0.07, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_deathmatch_001__episode_000018_t000034",
+      "reason": "RuntimeError('could not align start pose: pos_error=39.59, angle_error=1.87, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_deathmatch_001__episode_000012_t000029",
+      "reason": "RuntimeError('could not align start pose: pos_error=40.62, angle_error=0.63, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_multi_deathmatch_001__episode_000021_t000057",
+      "reason": "RuntimeError('could not align start pose: pos_error=21.54, angle_error=0.00, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_rocket_basic_001__episode_000007_t000182",
+      "reason": "RuntimeError('could not align start pose: pos_error=9.32, angle_error=1.76, mode=warp_align_after_replay_mismatch')"
+    },
+    {
+      "sample_id": "wit_vz_v4_default_rocket_basic_001__episode_000011_t000109",
+      "reason": "RuntimeError('could not align start pose: pos_error=9.01, angle_error=0.00, mode=warp_align_after_replay_mismatch')"
+    }
+  ],
+  "items": [
+    {
+      "sample_id": "wit_vz_v4_default_basic_001__episode_000038_t000226",
+      "label": "basic",
+      "case": "easy",
+      "scenario": "basic",
+      "metrics": {
+        "ours_ADE": 13.255273818969727,
+        "ours_FDE": 18.041847229003906,
+        "cv_ADE": 12.115724563598633,
+        "cv_FDE": 5.338196754455566,
+        "xu_ADE": 19.507054279376487,
+        "xu_FDE": 17.749784724423787
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 30.61513951637092,
+            "replay_angle_error": 40.42968750941327,
+            "final_position_error": 0.9465789825668206,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": -431.99314880371094,
+              "y": 239.9465789794922,
+              "z": 0.0,
+              "angle": 133.24218753102286
+            },
+            "start_pose": {
+              "x": -431.99322509765625,
+              "y": 239.0,
+              "z": 0.0,
+              "angle": 131.4843750306136
+            }
+          }
+        },
+        "xu": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 30.61513951637092,
+            "replay_angle_error": 40.42968750941327,
+            "final_position_error": 0.9465789825668206,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": -431.99314880371094,
+              "y": 239.9465789794922,
+              "z": 0.0,
+              "angle": 133.24218753102286
+            },
+            "start_pose": {
+              "x": -431.99322509765625,
+              "y": 239.0,
+              "z": 0.0,
+              "angle": 131.4843750306136
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 30.61513951637092,
+            "replay_angle_error": 40.42968750941327,
+            "final_position_error": 0.9465789825668206,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": -431.99314880371094,
+              "y": 239.9465789794922,
+              "z": 0.0,
+              "angle": 133.24218753102286
+            },
+            "start_pose": {
+              "x": -431.99322509765625,
+              "y": 239.0,
+              "z": 0.0,
+              "angle": 131.4843750306136
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 30.61513951637092,
+            "replay_angle_error": 40.42968750941327,
+            "final_position_error": 0.9465789825668206,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": -431.99314880371094,
+              "y": 239.9465789794922,
+              "z": 0.0,
+              "angle": 133.24218753102286
+            },
+            "start_pose": {
+              "x": -431.99322509765625,
+              "y": 239.0,
+              "z": 0.0,
+              "angle": 131.4843750306136
+            }
+          }
+        }
+      }
+    },
+    {
+      "sample_id": "wit_vz_v4_default_basic_001__episode_000010_t000201",
+      "label": "basic",
+      "case": "failure",
+      "scenario": "basic",
+      "metrics": {
+        "ours_ADE": 115.95381164550781,
+        "ours_FDE": 152.78079223632812,
+        "cv_ADE": 41.07752227783203,
+        "cv_FDE": 37.81208038330078,
+        "xu_ADE": 39.08116763417343,
+        "xu_FDE": 59.158204092276186
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 138.42686323210094,
+            "replay_angle_error": 3.5156250008185452,
+            "final_position_error": 1.0783717143766691,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 30.556869506835938,
+              "y": 6.9234619140625,
+              "z": 0.0,
+              "angle": 252.7734375588534
+            },
+            "start_pose": {
+              "x": 30.0,
+              "y": 6.0,
+              "z": 0.0,
+              "angle": 252.7734375588534
+            }
+          }
+        },
+        "xu": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 138.42686323210094,
+            "replay_angle_error": 3.5156250008185452,
+            "final_position_error": 1.0783717143766691,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 30.556869506835938,
+              "y": 6.9234619140625,
+              "z": 0.0,
+              "angle": 252.7734375588534
+            },
+            "start_pose": {
+              "x": 30.0,
+              "y": 6.0,
+              "z": 0.0,
+              "angle": 252.7734375588534
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 138.42686323210094,
+            "replay_angle_error": 3.5156250008185452,
+            "final_position_error": 1.0783717143766691,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 30.556869506835938,
+              "y": 6.9234619140625,
+              "z": 0.0,
+              "angle": 252.7734375588534
+            },
+            "start_pose": {
+              "x": 30.0,
+              "y": 6.0,
+              "z": 0.0,
+              "angle": 252.7734375588534
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 120.95756300747031,
+            "replay_angle_error": 3.5156250008185452,
+            "final_position_error": 1.0783717143766691,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 30.556869506835938,
+              "y": 6.9234619140625,
+              "z": 0.0,
+              "angle": 252.7734375588534
+            },
+            "start_pose": {
+              "x": 30.0,
+              "y": 6.0,
+              "z": 0.0,
+              "angle": 252.7734375588534
+            }
+          }
+        }
+      }
+    },
+    {
+      "sample_id": "wit_vz_v4_default_defend_the_center_001__episode_000011_t000039",
+      "label": "defend_the_center",
+      "case": "easy",
+      "scenario": "defend_the_center",
+      "metrics": {
+        "ours_ADE": 41.809635162353516,
+        "ours_FDE": 36.04465103149414,
+        "cv_ADE": 5.875725269317627,
+        "cv_FDE": 14.73865032196045,
+        "xu_ADE": 44.175122876009794,
+        "xu_FDE": 74.98097383896315
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 525.0008703168162,
+            "replay_angle_error": 26.36718750613909,
+            "final_position_error": 1.3473991675774013,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 778.2730407714844,
+              "y": -12.58160400390625,
+              "z": 0.0,
+              "angle": 10.546875002455636
+            },
+            "start_pose": {
+              "x": 778.0173797607422,
+              "y": -13.904525756835938,
+              "z": 0.0,
+              "angle": 12.304687502864908
+            }
+          }
+        },
+        "xu": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 525.0008703168162,
+            "replay_angle_error": 26.36718750613909,
+            "final_position_error": 1.3473991675774013,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 778.2730407714844,
+              "y": -12.58160400390625,
+              "z": 0.0,
+              "angle": 10.546875002455636
+            },
+            "start_pose": {
+              "x": 778.0173797607422,
+              "y": -13.904525756835938,
+              "z": 0.0,
+              "angle": 12.304687502864908
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 525.0008703168162,
+            "replay_angle_error": 26.36718750613909,
+            "final_position_error": 1.3473991675774013,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 778.2730407714844,
+              "y": -12.58160400390625,
+              "z": 0.0,
+              "angle": 10.546875002455636
+            },
+            "start_pose": {
+              "x": 778.0173797607422,
+              "y": -13.904525756835938,
+              "z": 0.0,
+              "angle": 12.304687502864908
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 525.0008703168162,
+            "replay_angle_error": 26.36718750613909,
+            "final_position_error": 1.3473991675774013,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 778.2730407714844,
+              "y": -12.58160400390625,
+              "z": 0.0,
+              "angle": 10.546875002455636
+            },
+            "start_pose": {
+              "x": 778.0173797607422,
+              "y": -13.904525756835938,
+              "z": 0.0,
+              "angle": 12.304687502864908
+            }
+          }
+        }
+      }
+    },
+    {
+      "sample_id": "wit_vz_v4_default_defend_the_center_001__episode_000039_t000041",
+      "label": "defend_the_center",
+      "case": "hard",
+      "scenario": "defend_the_center",
+      "metrics": {
+        "ours_ADE": 22.2199764251709,
+        "ours_FDE": 75.57717895507812,
+        "cv_ADE": 214.56797790527344,
+        "cv_FDE": 398.7077941894531,
+        "xu_ADE": 223.7192524602654,
+        "xu_FDE": 417.7422893992902
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 780.8400668053191,
+            "replay_angle_error": 73.82812501718945,
+            "final_position_error": 3.72111296167496,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 265.16033935546875,
+              "y": 724.8632354736328,
+              "z": 0.0,
+              "angle": 75.58593751759872
+            },
+            "start_pose": {
+              "x": 267.0232696533203,
+              "y": 728.0844421386719,
+              "z": 0.0,
+              "angle": 77.343750018008
+            }
+          }
+        },
+        "xu": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 780.8400668053191,
+            "replay_angle_error": 73.82812501718945,
+            "final_position_error": 3.72111296167496,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 265.16033935546875,
+              "y": 724.8632354736328,
+              "z": 0.0,
+              "angle": 75.58593751759872
+            },
+            "start_pose": {
+              "x": 267.0232696533203,
+              "y": 728.0844421386719,
+              "z": 0.0,
+              "angle": 77.343750018008
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 730.5112715979709,
+            "replay_angle_error": 73.82812501718945,
+            "final_position_error": 3.7238908621572597,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 265.16033935546875,
+              "y": 724.8632354736328,
+              "z": 0.0,
+              "angle": 75.58593751759872
+            },
+            "start_pose": {
+              "x": 267.0318603515625,
+              "y": 728.0826721191406,
+              "z": 0.0,
+              "angle": 77.343750018008
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 780.8400668053191,
+            "replay_angle_error": 73.82812501718945,
+            "final_position_error": 3.72111296167496,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 265.16033935546875,
+              "y": 724.8632354736328,
+              "z": 0.0,
+              "angle": 75.58593751759872
+            },
+            "start_pose": {
+              "x": 267.0232696533203,
+              "y": 728.0844421386719,
+              "z": 0.0,
+              "angle": 77.343750018008
+            }
+          }
+        }
+      }
+    },
+    {
+      "sample_id": "wit_vz_v4_default_defend_the_line_001__episode_000006_t000037",
+      "label": "defend_the_line",
+      "case": "failure",
+      "scenario": "defend_the_line",
+      "metrics": {
+        "ours_ADE": 134.64820861816406,
+        "ours_FDE": 238.66207885742188,
+        "cv_ADE": 59.30448913574219,
+        "cv_FDE": 61.717132568359375,
+        "xu_ADE": 58.56830734348334,
+        "xu_FDE": 87.01031343301386
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 5,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 317.7089707765459,
+            "replay_angle_error": 3.5156250008185452,
+            "final_position_error": 0.6790435286570158,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 29.607635498046875,
+              "y": 362.30311584472656,
+              "z": 0.0,
+              "angle": 22.851562505320544
+            },
+            "start_pose": {
+              "x": 29.0,
+              "y": 362.0,
+              "z": 0.0,
+              "angle": 21.09375000491127
+            }
+          }
+        },
+        "xu": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 178.44306119520107,
+            "replay_angle_error": 3.5156250008185452,
+            "final_position_error": 0.6790435286570158,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 29.607635498046875,
+              "y": 362.30311584472656,
+              "z": 0.0,
+              "angle": 22.851562505320544
+            },
+            "start_pose": {
+              "x": 29.0,
+              "y": 362.0,
+              "z": 0.0,
+              "angle": 21.09375000491127
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 266.6532797579972,
+            "replay_angle_error": 3.5156250008185452,
+            "final_position_error": 0.6790435286570158,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 29.607635498046875,
+              "y": 362.30311584472656,
+              "z": 0.0,
+              "angle": 22.851562505320544
+            },
+            "start_pose": {
+              "x": 29.0,
+              "y": 362.0,
+              "z": 0.0,
+              "angle": 21.09375000491127
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 284.25505914104673,
+            "replay_angle_error": 3.5156250008185452,
+            "final_position_error": 0.6790435286570158,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 29.607635498046875,
+              "y": 362.30311584472656,
+              "z": 0.0,
+              "angle": 22.851562505320544
+            },
+            "start_pose": {
+              "x": 29.0,
+              "y": 362.0,
+              "z": 0.0,
+              "angle": 21.09375000491127
+            }
+          }
+        }
+      }
+    },
+    {
+      "sample_id": "wit_vz_v4_default_multi_deathmatch_001__episode_000034_t000096",
+      "label": "multi_deathmatch",
+      "case": "easy",
+      "scenario": "multi_deathmatch",
+      "metrics": {
+        "ours_ADE": 4.383907794952393,
+        "ours_FDE": 6.601995944976807,
+        "cv_ADE": 1.6348663568496704,
+        "cv_FDE": 0.23673729598522186,
+        "xu_ADE": 9.187805436909267,
+        "xu_FDE": 14.972952602331956
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 502.2895858209382,
+            "replay_angle_error": 38.671875009004,
+            "final_position_error": 0.07407737115855798,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 335.9976043701172,
+              "y": 16.0733642578125,
+              "z": 0.0,
+              "angle": 284.4140625662203
+            },
+            "start_pose": {
+              "x": 335.9873504638672,
+              "y": 16.0,
+              "z": 0.0,
+              "angle": 282.65625006581104
+            }
+          }
+        },
+        "xu": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 375.36516296446916,
+            "replay_angle_error": 38.671875009004,
+            "final_position_error": 0.07407737115855798,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 335.9976043701172,
+              "y": 16.0733642578125,
+              "z": 0.0,
+              "angle": 284.4140625662203
+            },
+            "start_pose": {
+              "x": 335.9873504638672,
+              "y": 16.0,
+              "z": 0.0,
+              "angle": 282.65625006581104
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 501.05970712601726,
+            "replay_angle_error": 38.671875009004,
+            "final_position_error": 0.07407737115855798,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 335.9976043701172,
+              "y": 16.0733642578125,
+              "z": 0.0,
+              "angle": 284.4140625662203
+            },
+            "start_pose": {
+              "x": 335.9873504638672,
+              "y": 16.0,
+              "z": 0.0,
+              "angle": 282.65625006581104
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 375.4693602109861,
+            "replay_angle_error": 38.671875009004,
+            "final_position_error": 0.07407737115855798,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 335.9976043701172,
+              "y": 16.0733642578125,
+              "z": 0.0,
+              "angle": 284.4140625662203
+            },
+            "start_pose": {
+              "x": 335.9873504638672,
+              "y": 16.0,
+              "z": 0.0,
+              "angle": 282.65625006581104
+            }
+          }
+        }
+      }
+    },
+    {
+      "sample_id": "wit_vz_v4_default_multi_deathmatch_001__episode_000025_t000023",
+      "label": "multi_deathmatch",
+      "case": "failure",
+      "scenario": "multi_deathmatch",
+      "metrics": {
+        "ours_ADE": 160.41683959960938,
+        "ours_FDE": 355.5096130371094,
+        "cv_ADE": 37.737449645996094,
+        "cv_FDE": 114.74671936035156,
+        "xu_ADE": 36.372868670701244,
+        "xu_FDE": 108.67570935860188
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 125.202362151059,
+            "replay_angle_error": 15.820312503683454,
+            "final_position_error": 0.9809910578211787,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 463.9533996582031,
+              "y": 431.9805603027344,
+              "z": 0.0,
+              "angle": 66.79687501555236
+            },
+            "start_pose": {
+              "x": 463.9824676513672,
+              "y": 431.0,
+              "z": 0.0,
+              "angle": 68.55468751596163
+            }
+          }
+        },
+        "xu": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 118.51202402140305,
+            "replay_angle_error": 15.820312503683454,
+            "final_position_error": 0.9806193093903419,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 463.9533996582031,
+              "y": 431.9805603027344,
+              "z": 0.0,
+              "angle": 66.79687501555236
+            },
+            "start_pose": {
+              "x": 463.9641571044922,
+              "y": 431.0,
+              "z": 0.0,
+              "angle": 68.55468751596163
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 317.65726917295046,
+            "replay_angle_error": 15.820312503683454,
+            "final_position_error": 0.03402448567156566,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 463.9533996582031,
+              "y": 431.9805603027344,
+              "z": 0.0,
+              "angle": 66.79687501555236
+            },
+            "start_pose": {
+              "x": 463.96875,
+              "y": 431.9501953125,
+              "z": 0.0,
+              "angle": 68.55468751596163
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 210.32969519684576,
+            "replay_angle_error": 15.820312503683454,
+            "final_position_error": 0.03399003751759459,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 463.9533996582031,
+              "y": 431.9805603027344,
+              "z": 0.0,
+              "angle": 66.79687501555236
+            },
+            "start_pose": {
+              "x": 463.96861267089844,
+              "y": 431.9501647949219,
+              "z": 0.0,
+              "angle": 68.55468751596163
+            }
+          }
+        }
+      }
+    },
+    {
+      "sample_id": "wit_vz_v4_default_rocket_basic_001__episode_000007_t000029",
+      "label": "rocket_basic",
+      "case": "easy",
+      "scenario": "rocket_basic",
+      "metrics": {
+        "ours_ADE": 26.23967742919922,
+        "ours_FDE": 48.830894470214844,
+        "cv_ADE": 14.23083209991455,
+        "cv_FDE": 9.636245727539062,
+        "xu_ADE": 34.19509376185499,
+        "xu_FDE": 49.48324608064826
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 279.87975031354887,
+            "replay_angle_error": 49.21875001145963,
+            "final_position_error": 4.834667503874442,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 47.99024963378906,
+              "y": -36.70436096191406,
+              "z": 0.0,
+              "angle": 335.3906250780892
+            },
+            "start_pose": {
+              "x": 47.900360107421875,
+              "y": -31.870529174804688,
+              "z": 0.0,
+              "angle": 337.1484375784985
+            }
+          }
+        },
+        "xu": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 279.87975031354887,
+            "replay_angle_error": 49.21875001145963,
+            "final_position_error": 4.834667503874442,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 47.99024963378906,
+              "y": -36.70436096191406,
+              "z": 0.0,
+              "angle": 335.3906250780892
+            },
+            "start_pose": {
+              "x": 47.900360107421875,
+              "y": -31.870529174804688,
+              "z": 0.0,
+              "angle": 337.1484375784985
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 279.87975031354887,
+            "replay_angle_error": 49.21875001145963,
+            "final_position_error": 4.834667503874442,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 47.99024963378906,
+              "y": -36.70436096191406,
+              "z": 0.0,
+              "angle": 335.3906250780892
+            },
+            "start_pose": {
+              "x": 47.900360107421875,
+              "y": -31.870529174804688,
+              "z": 0.0,
+              "angle": 337.1484375784985
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "warp_align_after_replay_mismatch",
+            "replay_position_error": 279.87975031354887,
+            "replay_angle_error": 49.21875001145963,
+            "final_position_error": 4.834667503874442,
+            "final_angle_error": 1.7578125004092726,
+            "target_pose": {
+              "x": 47.99024963378906,
+              "y": -36.70436096191406,
+              "z": 0.0,
+              "angle": 335.3906250780892
+            },
+            "start_pose": {
+              "x": 47.900360107421875,
+              "y": -31.870529174804688,
+              "z": 0.0,
+              "angle": 337.1484375784985
+            }
+          }
+        }
+      }
+    }
+  ]
+}

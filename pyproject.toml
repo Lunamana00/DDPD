@@ -26,8 +26,34 @@ server = [
 vizdoom = [
     "vizdoom>=1.2",
 ]
+human-replay = [
+    "datasets>=4.0",
+]
 ai2thor = [
     "ai2thor>=5.0",
+]
+procthor = [
+    "attrs>=23",
+    "pandas>=2",
+    "shapely>=2",
+    "moviepy<2",
+    "python-fcl>=0.7",
+    "scipy>=1.11",
+]
+miniworld = [
+    "gymnasium>=1.0",
+    "miniworld>=2.1",
+]
+external-demo = [
+    "ai2thor>=5.0",
+    "attrs>=23",
+    "gymnasium>=1.0",
+    "miniworld>=2.1",
+    "pandas>=2",
+    "python-fcl>=0.7",
+    "scipy>=1.11",
+    "shapely>=2",
+    "moviepy<2",
 ]
 
 [dependency-groups]

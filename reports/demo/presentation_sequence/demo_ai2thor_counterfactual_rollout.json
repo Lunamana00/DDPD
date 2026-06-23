@@ -1,0 +1,172 @@
+{
+  "output": "reports/demo/presentation_sequence/demo_ai2thor_counterfactual_rollout.mp4",
+  "mode": "external_real_counterfactual_rollout",
+  "columns": [
+    "CV baseline",
+    "GT",
+    "Ours"
+  ],
+  "branch_videos": {
+    "cv": "reports/demo/presentation_sequence/demo_ai2thor_counterfactual_rollout_cv.mp4",
+    "target": "reports/demo/presentation_sequence/demo_ai2thor_counterfactual_rollout_target.mp4",
+    "prediction": "reports/demo/presentation_sequence/demo_ai2thor_counterfactual_rollout_prediction.mp4"
+  },
+  "success_count": 2,
+  "skipped": [],
+  "items": [
+    {
+      "env_name": "AI2-THOR",
+      "group": "FloorPlan1",
+      "case": "hard",
+      "sample_id": "ai2thor_demo_001__episode_000001_t000004",
+      "metrics": {
+        "ours_ADE": 11.669175148010254,
+        "ours_FDE": 20.64902114868164,
+        "cv_ADE": 1.0219178199768066,
+        "cv_FDE": 2.000000238418579
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "ai2thor_teleport",
+            "scene": "FloorPlan1",
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": -1.75,
+              "y": 0.0,
+              "z": 0.900999128818512,
+              "angle": 180.0
+            },
+            "start_pose": {
+              "x": -1.75,
+              "y": 0.0,
+              "z": 0.900999128818512,
+              "angle": 180.0
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "ai2thor_teleport",
+            "scene": "FloorPlan1",
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": -1.75,
+              "y": 0.0,
+              "z": 0.900999128818512,
+              "angle": 180.0
+            },
+            "start_pose": {
+              "x": -1.75,
+              "y": 0.0,
+              "z": 0.900999128818512,
+              "angle": 180.0
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "ai2thor_teleport",
+            "scene": "FloorPlan1",
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": -1.75,
+              "y": 0.0,
+              "z": 0.900999128818512,
+              "angle": 180.0
+            },
+            "start_pose": {
+              "x": -1.75,
+              "y": 0.0,
+              "z": 0.900999128818512,
+              "angle": 180.0
+            }
+          }
+        }
+      }
+    },
+    {
+      "env_name": "AI2-THOR",
+      "group": "FloorPlan201",
+      "case": "hard",
+      "sample_id": "ai2thor_demo_001__episode_000002_t000019",
+      "metrics": {
+        "ours_ADE": 6.6983819007873535,
+        "ours_FDE": 5.612584590911865,
+        "cv_ADE": 1.5431402921676636,
+        "cv_FDE": 2.0615527629852295
+      },
+      "rollouts": {
+        "cv": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "ai2thor_teleport",
+            "scene": "FloorPlan201",
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 5.75,
+              "y": -2.5,
+              "z": 0.9026566743850708,
+              "angle": 315.0
+            },
+            "start_pose": {
+              "x": 5.75,
+              "y": -2.5,
+              "z": 0.9026566743850708,
+              "angle": 315.0
+            }
+          }
+        },
+        "target": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "ai2thor_teleport",
+            "scene": "FloorPlan201",
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 5.75,
+              "y": -2.5,
+              "z": 0.9026566743850708,
+              "angle": 315.0
+            },
+            "start_pose": {
+              "x": 5.75,
+              "y": -2.5,
+              "z": 0.9026566743850708,
+              "angle": 315.0
+            }
+          }
+        },
+        "prediction": {
+          "frames": 15,
+          "start_info": {
+            "start_mode": "ai2thor_teleport",
+            "scene": "FloorPlan201",
+            "final_position_error": 0.0,
+            "final_angle_error": 0.0,
+            "target_pose": {
+              "x": 5.75,
+              "y": -2.5,
+              "z": 0.9026566743850708,
+              "angle": 315.0
+            },
+            "start_pose": {
+              "x": 5.75,
+              "y": -2.5,
+              "z": 0.9026566743850708,
+              "angle": 315.0
+            }
+          }
+        }
+      }
+    }
+  ]
+}

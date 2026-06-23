@@ -1,0 +1,161 @@
+{
+  "output": "reports/demo/presentation_sequence/demo_main_5baseline_multiscenario_05s.mp4",
+  "poster": "reports/demo/presentation_sequence/demo_main_5baseline_multiscenario_05s.png",
+  "mode": "main_5baseline_multiscenario_05s",
+  "columns": [
+    "CV",
+    "PointNav",
+    "A*",
+    "GT",
+    "Ours"
+  ],
+  "fps": 8,
+  "moving_frames": 300,
+  "missing_frame_count": 0,
+  "items": [
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000061",
+      "block": "Human-action replay GT",
+      "gt_source": "human-action replay-derived GT",
+      "label": "defend_the_center",
+      "case": "easy",
+      "frames_rendered": 25,
+      "cv_ADE": 66.33297012861235,
+      "pointnav_ADE": 30.3765278425686,
+      "astar_ADE": 28.862852754577972,
+      "ours_ADE": 19.54728431530824
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000009",
+      "block": "Human-action replay GT",
+      "gt_source": "human-action replay-derived GT",
+      "label": "defend_the_center",
+      "case": "CV-hard / ours better",
+      "frames_rendered": 25,
+      "cv_ADE": 297.52730648826315,
+      "pointnav_ADE": 127.22156997774593,
+      "astar_ADE": 101.31082043101756,
+      "ours_ADE": 161.5408092146683
+    },
+    {
+      "sample_id": "wit_vz_sauerkrautlm_human_replay_001__episode_000002_t000071",
+      "block": "Human-action replay GT",
+      "gt_source": "human-action replay-derived GT",
+      "label": "defend_the_center",
+      "case": "ours worse than CV",
+      "frames_rendered": 25,
+      "cv_ADE": 98.12912789536676,
+      "pointnav_ADE": 45.60859011820477,
+      "astar_ADE": 44.992744601121885,
+      "ours_ADE": 420.53797547852923
+    },
+    {
+      "sample_id": "wit_vz_v4_default_my_way_home_001__episode_000005_t000154",
+      "block": "V4 multi-scenario GT",
+      "gt_source": "recorded ViZDoom policy trajectory GT",
+      "label": "my_way_home",
+      "case": "CV-hard / Ours better",
+      "frames_rendered": 25,
+      "cv_ADE": 322.2217102050781,
+      "pointnav_ADE": 6.668313026428223,
+      "astar_ADE": 6.668313026428223,
+      "ours_ADE": 26.464956283569336
+    },
+    {
+      "sample_id": "wit_vz_v4_default_rocket_basic_001__episode_000021_t000196",
+      "block": "V4 multi-scenario GT",
+      "gt_source": "recorded ViZDoom policy trajectory GT",
+      "label": "rocket_basic",
+      "case": "mixed",
+      "frames_rendered": 25,
+      "cv_ADE": 106.21599578857422,
+      "pointnav_ADE": 37.953155517578125,
+      "astar_ADE": 39.15861892700195,
+      "ours_ADE": 180.2057342529297
+    },
+    {
+      "sample_id": "wit_vz_v4_default_basic_001__episode_000039_t000158",
+      "block": "V4 multi-scenario GT",
+      "gt_source": "recorded ViZDoom policy trajectory GT",
+      "label": "basic",
+      "case": "mixed",
+      "frames_rendered": 25,
+      "cv_ADE": 174.15135192871094,
+      "pointnav_ADE": 62.9105224609375,
+      "astar_ADE": 67.75159454345703,
+      "ours_ADE": 174.1317138671875
+    },
+    {
+      "sample_id": "wit_vz_v4_default_health_gathering_001__episode_000038_t000008",
+      "block": "V4 multi-scenario GT",
+      "gt_source": "recorded ViZDoom policy trajectory GT",
+      "label": "health_gathering",
+      "case": "CV-hard / Ours better",
+      "frames_rendered": 25,
+      "cv_ADE": 462.1326599121094,
+      "pointnav_ADE": 170.34530639648438,
+      "astar_ADE": 164.17320251464844,
+      "ours_ADE": 128.16998291015625
+    },
+    {
+      "sample_id": "wit_vz_v4_default_health_gathering_supreme_001__episode_000040_t000033",
+      "block": "V4 multi-scenario GT",
+      "gt_source": "recorded ViZDoom policy trajectory GT",
+      "label": "health_gathering_supreme",
+      "case": "Ours failure",
+      "frames_rendered": 25,
+      "cv_ADE": 301.55877685546875,
+      "pointnav_ADE": 127.00352478027344,
+      "astar_ADE": 128.3802947998047,
+      "ours_ADE": 507.9195251464844
+    },
+    {
+      "sample_id": "wit_vz_v4_default_deadly_corridor_001__episode_000014_t000013",
+      "block": "V4 multi-scenario GT",
+      "gt_source": "recorded ViZDoom policy trajectory GT",
+      "label": "deadly_corridor",
+      "case": "easy",
+      "frames_rendered": 25,
+      "cv_ADE": 56.038387298583984,
+      "pointnav_ADE": 8.949642181396484,
+      "astar_ADE": 8.949641227722168,
+      "ours_ADE": 47.1240119934082
+    },
+    {
+      "sample_id": "wit_vz_v4_default_deathmatch_001__episode_000025_t000026",
+      "block": "V4 multi-scenario GT",
+      "gt_source": "recorded ViZDoom policy trajectory GT",
+      "label": "deathmatch",
+      "case": "CV-hard / Ours better",
+      "frames_rendered": 25,
+      "cv_ADE": 396.7701416015625,
+      "pointnav_ADE": 37.95570755004883,
+      "astar_ADE": 37.95570755004883,
+      "ours_ADE": 90.35713958740234
+    },
+    {
+      "sample_id": "wit_vz_v4_default_multi_deathmatch_001__episode_000024_t000098",
+      "block": "V4 multi-scenario GT",
+      "gt_source": "recorded ViZDoom policy trajectory GT",
+      "label": "multi_deathmatch",
+      "case": "Ours failure",
+      "frames_rendered": 25,
+      "cv_ADE": 98.13836669921875,
+      "pointnav_ADE": 44.895408630371094,
+      "astar_ADE": 45.21524429321289,
+      "ours_ADE": 306.4098815917969
+    },
+    {
+      "sample_id": "wit_vz_v4_default_predict_position_001__episode_000017_t000091",
+      "block": "V4 multi-scenario GT",
+      "gt_source": "recorded ViZDoom policy trajectory GT",
+      "label": "predict_position",
+      "case": "mixed",
+      "frames_rendered": 25,
+      "cv_ADE": 158.02908325195312,
+      "pointnav_ADE": 32.888267517089844,
+      "astar_ADE": 43.63178634643555,
+      "ours_ADE": 158.03076171875
+    }
+  ]
+}

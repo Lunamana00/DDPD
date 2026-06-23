@@ -309,8 +309,21 @@ class VisualGuidanceMSTPSelectorBaseline(nn.Module):
             weights = models.ResNet18_Weights.DEFAULT if pretrained else None
             return models.resnet18(weights=weights)
         except Exception:
-            import torchvision.models as models
-            return models.resnet18(weights=None)
+            # Keep the selector usable in minimal environments where torchvision
+            # is not installed. The final Identity acts like ResNet's fc layer so
+            # callers that drop the last child still retain adaptive pooling.
+            return nn.Sequential(
+                nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(256, 512, kernel_size=3, stride=2, padding=1),
+                nn.ReLU(inplace=True),
+                nn.AdaptiveAvgPool2d((1, 1)),
+                nn.Identity(),
+            )
 
     def forward(self, batch: dict[str, torch.Tensor]) -> torch.Tensor:
         images = batch["image"]

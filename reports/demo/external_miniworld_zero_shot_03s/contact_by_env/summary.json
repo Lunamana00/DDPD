@@ -1,0 +1,122 @@
+[
+  {
+    "group": "MiniWorld-Hallway-v0",
+    "case": "easy",
+    "sample_id": "miniworld_demo_001__episode_000002_t000033",
+    "ADE": 4.0497918128967285,
+    "FDE": 6.952082633972168,
+    "constant_velocity_ADE": 0.0,
+    "constant_velocity_FDE": 0.0,
+    "image": "MiniWorld-Hallway-v0/easy_01.png"
+  },
+  {
+    "group": "MiniWorld-Hallway-v0",
+    "case": "hard",
+    "sample_id": "miniworld_demo_001__episode_000001_t000005",
+    "ADE": 3.6769137382507324,
+    "FDE": 7.425421237945557,
+    "constant_velocity_ADE": 0.7539612650871277,
+    "constant_velocity_FDE": 1.2871811389923096,
+    "image": "MiniWorld-Hallway-v0/hard_02.png"
+  },
+  {
+    "group": "MiniWorld-Hallway-v0",
+    "case": "failure",
+    "sample_id": "miniworld_demo_001__episode_000002_t000004",
+    "ADE": 124.1244888305664,
+    "FDE": 201.51710510253906,
+    "constant_velocity_ADE": 0.45327913761138916,
+    "constant_velocity_FDE": 0.7502196431159973,
+    "image": "MiniWorld-Hallway-v0/failure_03.png"
+  },
+  {
+    "group": "MiniWorld-Maze-v0",
+    "case": "easy",
+    "sample_id": "miniworld_demo_001__episode_000004_t000013",
+    "ADE": 4.043692111968994,
+    "FDE": 1.9628996849060059,
+    "constant_velocity_ADE": 0.0,
+    "constant_velocity_FDE": 0.0,
+    "image": "MiniWorld-Maze-v0/easy_01.png"
+  },
+  {
+    "group": "MiniWorld-Maze-v0",
+    "case": "hard",
+    "sample_id": "miniworld_demo_001__episode_000004_t000013",
+    "ADE": 4.043692111968994,
+    "FDE": 1.9628996849060059,
+    "constant_velocity_ADE": 0.0,
+    "constant_velocity_FDE": 0.0,
+    "image": "MiniWorld-Maze-v0/hard_02.png"
+  },
+  {
+    "group": "MiniWorld-Maze-v0",
+    "case": "failure",
+    "sample_id": "miniworld_demo_001__episode_000004_t000058",
+    "ADE": 146.23348999023438,
+    "FDE": 247.83151245117188,
+    "constant_velocity_ADE": 0.0,
+    "constant_velocity_FDE": 0.0,
+    "image": "MiniWorld-Maze-v0/failure_03.png"
+  },
+  {
+    "group": "MiniWorld-ThreeRooms-v0",
+    "case": "easy",
+    "sample_id": "miniworld_demo_001__episode_000007_t000056",
+    "ADE": 2.788309335708618,
+    "FDE": 6.222158908843994,
+    "constant_velocity_ADE": 0.0,
+    "constant_velocity_FDE": 0.0,
+    "image": "MiniWorld-ThreeRooms-v0/easy_01.png"
+  },
+  {
+    "group": "MiniWorld-ThreeRooms-v0",
+    "case": "hard",
+    "sample_id": "miniworld_demo_001__episode_000008_t000042",
+    "ADE": 1.5489245653152466,
+    "FDE": 2.5207126140594482,
+    "constant_velocity_ADE": 0.28445008397102356,
+    "constant_velocity_FDE": 0.7401308417320251,
+    "image": "MiniWorld-ThreeRooms-v0/hard_02.png"
+  },
+  {
+    "group": "MiniWorld-ThreeRooms-v0",
+    "case": "failure",
+    "sample_id": "miniworld_demo_001__episode_000008_t000025",
+    "ADE": 58.62311553955078,
+    "FDE": 100.55998229980469,
+    "constant_velocity_ADE": 0.13843894004821777,
+    "constant_velocity_FDE": 0.2228630781173706,
+    "image": "MiniWorld-ThreeRooms-v0/failure_03.png"
+  },
+  {
+    "group": "MiniWorld-WallGap-v0",
+    "case": "easy",
+    "sample_id": "miniworld_demo_001__episode_000006_t000060",
+    "ADE": 10.387322425842285,
+    "FDE": 19.639585494995117,
+    "constant_velocity_ADE": 0.0,
+    "constant_velocity_FDE": 0.0,
+    "image": "MiniWorld-WallGap-v0/easy_01.png"
+  },
+  {
+    "group": "MiniWorld-WallGap-v0",
+    "case": "hard",
+    "sample_id": "miniworld_demo_001__episode_000006_t000047",
+    "ADE": 3.0010221004486084,
+    "FDE": 2.086580991744995,
+    "constant_velocity_ADE": 0.5780000686645508,
+    "constant_velocity_FDE": 1.2000001668930054,
+    "image": "MiniWorld-WallGap-v0/hard_02.png"
+  },
+  {
+    "group": "MiniWorld-WallGap-v0",
+    "case": "failure",
+    "sample_id": "miniworld_demo_001__episode_000005_t000063",
+    "ADE": 135.230712890625,
+    "FDE": 240.3395538330078,
+    "constant_velocity_ADE": 0.4059222936630249,
+    "constant_velocity_FDE": 0.8131492137908936,
+    "image": "MiniWorld-WallGap-v0/failure_03.png"
+  }
+]

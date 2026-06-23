@@ -1,0 +1,95 @@
+{
+  "output": "reports/demo/presentation_sequence/demo_final_main_with_external_05s.mp4",
+  "mode": "final_main_counterfactual_plus_external_section",
+  "fps": 8,
+  "width": 2560,
+  "height": 1440,
+  "sections": [
+    {
+      "type": "video",
+      "name": "main_vizdoom_counterfactual",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/presentation_sequence/demo_main_5baseline_multiscenario_counterfactual_05s.mp4",
+      "fps": 8.0,
+      "input_frames": 396,
+      "written_frames": 396
+    },
+    {
+      "type": "metrics_card",
+      "name": "main_vizdoom_metrics_05s",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/main_5baseline_multiscenario_05s/metrics.json",
+      "written_frames": 40
+    },
+    {
+      "type": "title_card",
+      "name": "external_section_intro",
+      "written_frames": 16
+    },
+    {
+      "type": "video",
+      "name": "demo_miniworld_counterfactual_rollout",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/presentation_sequence/demo_miniworld_counterfactual_rollout.mp4",
+      "fps": 8.0,
+      "input_frames": 46,
+      "written_frames": 46
+    },
+    {
+      "type": "video",
+      "name": "demo_ai2thor_counterfactual_rollout",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/presentation_sequence/demo_ai2thor_counterfactual_rollout.mp4",
+      "fps": 8.0,
+      "input_frames": 46,
+      "written_frames": 46
+    },
+    {
+      "type": "metrics_card",
+      "name": "external_zero_shot_metrics_03s",
+      "paths": [
+        "/home/taehyun/projects/DDPD/reports/demo/external_miniworld_zero_shot_03s/eval_all/metrics.json",
+        "/home/taehyun/projects/DDPD/reports/demo/external_ai2thor_zero_shot_03s/eval_all/metrics.json",
+        "/home/taehyun/projects/DDPD/reports/demo/external_procthor_zero_shot_03s/eval_all/metrics.json",
+        "/home/taehyun/projects/DDPD/reports/demo/external_deepmind_lab_zero_shot_03s/eval_all/metrics.json",
+        "/home/taehyun/projects/DDPD/reports/demo/external_habitat_zero_shot_03s/eval_all/metrics.json",
+        "/home/taehyun/projects/DDPD/reports/demo/external_minedojo_zero_shot_03s/eval_all/metrics.json"
+      ],
+      "written_frames": 40
+    },
+    {
+      "type": "overview_card",
+      "name": "MiniWorld overview",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/presentation_sequence/06_miniworld_external_overview.png",
+      "written_frames": 16
+    },
+    {
+      "type": "overview_card",
+      "name": "AI2-THOR overview",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/presentation_sequence/07_ai2thor_external_overview.png",
+      "written_frames": 16
+    },
+    {
+      "type": "overview_card",
+      "name": "ProcTHOR overview",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/presentation_sequence/08_procthor_external_overview.png",
+      "written_frames": 16
+    },
+    {
+      "type": "overview_card",
+      "name": "DeepMind Lab overview",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/presentation_sequence/09_deepmind_lab_external_overview.png",
+      "written_frames": 16
+    },
+    {
+      "type": "overview_card",
+      "name": "Habitat overview",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/presentation_sequence/10_habitat_external_overview.png",
+      "written_frames": 16
+    },
+    {
+      "type": "overview_card",
+      "name": "MineDojo overview",
+      "path": "/home/taehyun/projects/DDPD/reports/demo/presentation_sequence/11_minedojo_external_overview.png",
+      "written_frames": 16
+    }
+  ],
+  "poster": "reports/demo/presentation_sequence/demo_final_main_with_external_05s.png",
+  "total_frames": 680
+}

@@ -1,0 +1,118 @@
+{
+  "dataset": "data/wit_vz/processed/horizon_sweep_v4_defaults/future_03s",
+  "predictions": "runs/episodic_memory_ablation_v4/seed_7/03s/long_attention_no_ego/predictions.jsonl",
+  "scenarios": [
+    "basic",
+    "my_way_home",
+    "health_gathering",
+    "defend_the_line",
+    "predict_position",
+    "deathmatch"
+  ],
+  "cases": [
+    "hard"
+  ],
+  "raw_dirs": {
+    "wit_vz_v4_default_basic_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_basic_001",
+    "wit_vz_v4_default_basic_audio_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_basic_audio_001",
+    "wit_vz_v4_default_basic_notifications_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_basic_notifications_001",
+    "wit_vz_v4_default_deadly_corridor_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_deadly_corridor_001",
+    "wit_vz_v4_default_deathmatch_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_deathmatch_001",
+    "wit_vz_v4_default_defend_the_center_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_defend_the_center_001",
+    "wit_vz_v4_default_defend_the_line_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_defend_the_line_001",
+    "wit_vz_v4_default_health_gathering_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_health_gathering_001",
+    "wit_vz_v4_default_health_gathering_supreme_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_health_gathering_supreme_001",
+    "wit_vz_v4_default_multi_deathmatch_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_multi_deathmatch_001",
+    "wit_vz_v4_default_my_way_home_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_my_way_home_001",
+    "wit_vz_v4_default_predict_position_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_predict_position_001",
+    "wit_vz_v4_default_rocket_basic_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_rocket_basic_001",
+    "wit_vz_v4_default_simpler_basic_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_simpler_basic_001",
+    "wit_vz_v4_default_take_cover_001": "/home/taehyun/projects/DDPD/data/wit_vz/raw/wit_vz_v4_default_take_cover_001"
+  },
+  "selected": [
+    {
+      "scenario": "basic",
+      "case": "hard",
+      "case_index": 1,
+      "sample_id": "wit_vz_v4_default_basic_001__episode_000038_t000056",
+      "episode_id": "wit_vz_v4_default_basic_001__episode_000038",
+      "center_step": 56,
+      "policy": "random_walk",
+      "ADE": 76.31352276512729,
+      "FDE": 139.91825320829238,
+      "cv_ADE": 188.42143821907692,
+      "cv_FDE": 323.2555275761499,
+      "model_minus_cv_ADE": -112.10791545394963
+    },
+    {
+      "scenario": "my_way_home",
+      "case": "hard",
+      "case_index": 1,
+      "sample_id": "wit_vz_v4_default_my_way_home_001__episode_000025_t000190",
+      "episode_id": "wit_vz_v4_default_my_way_home_001__episode_000025",
+      "center_step": 190,
+      "policy": "obstacle_avoidance",
+      "ADE": 22.502432273614456,
+      "FDE": 25.88351161701297,
+      "cv_ADE": 178.480693181585,
+      "cv_FDE": 337.7761143816118,
+      "model_minus_cv_ADE": -155.97826090797054
+    },
+    {
+      "scenario": "health_gathering",
+      "case": "hard",
+      "case_index": 1,
+      "sample_id": "wit_vz_v4_default_health_gathering_001__episode_000037_t000021",
+      "episode_id": "wit_vz_v4_default_health_gathering_001__episode_000037",
+      "center_step": 21,
+      "policy": "obstacle_avoidance",
+      "ADE": 44.34146078676448,
+      "FDE": 58.25298372769099,
+      "cv_ADE": 221.6321134085361,
+      "cv_FDE": 377.2170682701316,
+      "model_minus_cv_ADE": -177.2906526217716
+    },
+    {
+      "scenario": "defend_the_line",
+      "case": "hard",
+      "case_index": 1,
+      "sample_id": "wit_vz_v4_default_defend_the_line_001__episode_000032_t000017",
+      "episode_id": "wit_vz_v4_default_defend_the_line_001__episode_000032",
+      "center_step": 17,
+      "policy": "obstacle_avoidance",
+      "ADE": 75.41357001687726,
+      "FDE": 134.06556503950844,
+      "cv_ADE": 237.51116368927708,
+      "cv_FDE": 367.23317470464383,
+      "model_minus_cv_ADE": -162.09759367239982
+    },
+    {
+      "scenario": "predict_position",
+      "case": "hard",
+      "case_index": 1,
+      "sample_id": "wit_vz_v4_default_predict_position_001__episode_000029_t000133",
+      "episode_id": "wit_vz_v4_default_predict_position_001__episode_000029",
+      "center_step": 133,
+      "policy": "random_walk",
+      "ADE": 44.07012751030615,
+      "FDE": 8.516660493416344,
+      "cv_ADE": 214.76581985373443,
+      "cv_FDE": 344.80062033358,
+      "model_minus_cv_ADE": -170.69569234342828
+    },
+    {
+      "scenario": "deathmatch",
+      "case": "hard",
+      "case_index": 1,
+      "sample_id": "wit_vz_v4_default_deathmatch_001__episode_000018_t000034",
+      "episode_id": "wit_vz_v4_default_deathmatch_001__episode_000018",
+      "center_step": 34,
+      "policy": "goal_directed",
+      "ADE": 47.064308737772784,
+      "FDE": 47.60114950037605,
+      "cv_ADE": 229.7042095798534,
+      "cv_FDE": 280.98064518419926,
+      "model_minus_cv_ADE": -182.6399008420806
+    }
+  ]
+}

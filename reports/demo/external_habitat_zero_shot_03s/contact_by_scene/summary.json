@@ -1,0 +1,32 @@
+[
+  {
+    "group": "skokloster-castle",
+    "case": "easy",
+    "sample_id": "habitat_demo_001__episode_000001_t000014",
+    "ADE": 74.34207153320312,
+    "FDE": 122.92340087890625,
+    "constant_velocity_ADE": 0.15950897336006165,
+    "constant_velocity_FDE": 0.20024418830871582,
+    "image": "skokloster-castle/easy_01.png"
+  },
+  {
+    "group": "skokloster-castle",
+    "case": "hard",
+    "sample_id": "habitat_demo_001__episode_000003_t000022",
+    "ADE": 3.5367605686187744,
+    "FDE": 5.3948750495910645,
+    "constant_velocity_ADE": 0.5635080337524414,
+    "constant_velocity_FDE": 1.2902412414550781,
+    "image": "skokloster-castle/hard_02.png"
+  },
+  {
+    "group": "skokloster-castle",
+    "case": "failure",
+    "sample_id": "habitat_demo_001__episode_000002_t000006",
+    "ADE": 139.18605041503906,
+    "FDE": 264.93017578125,
+    "constant_velocity_ADE": 0.6058264970779419,
+    "constant_velocity_FDE": 1.321523666381836,
+    "image": "skokloster-castle/failure_03.png"
+  }
+]

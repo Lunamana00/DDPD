@@ -12,7 +12,7 @@ from .baselines import (
     XuPixelsOnlyTrajectoryBaseline,
     VideoHistoryBaseline,
 )
-from .cue_memory import TwoStreamEgocentricCueMemoryPathPredictor
+from .cue_memory import EpisodicLongTermCueMemoryPathPredictor, TwoStreamEgocentricCueMemoryPathPredictor
 
 
 def create_model(
@@ -65,8 +65,13 @@ def create_model(
             num_heads=int(kwargs.get("num_heads", 4)),
             dropout=float(kwargs.get("dropout", 0.1)),
         )
-    if name == "cue_memory_path_predictor":
-        return TwoStreamEgocentricCueMemoryPathPredictor(
+    if name in {"cue_memory_path_predictor", "episodic_long_term_cue_memory_path_predictor", "episodic_cue_memory_path_predictor"}:
+        model_cls = (
+            EpisodicLongTermCueMemoryPathPredictor
+            if name in {"episodic_long_term_cue_memory_path_predictor", "episodic_cue_memory_path_predictor"}
+            else TwoStreamEgocentricCueMemoryPathPredictor
+        )
+        common_kwargs = dict(
             future_steps=future_steps,
             backbone_name=backbone_name,
             hidden_dim=hidden_dim,
@@ -86,19 +91,36 @@ def create_model(
             use_temporal_difference_conv=bool(kwargs.get("use_temporal_difference_conv", False)),
             use_temporal_shift=bool(kwargs.get("use_temporal_shift", False)),
             decoder_layers=int(kwargs.get("decoder_layers", 1)),
+            decoder_type=str(kwargs.get("decoder_type", "horizon_query_decoder")),
             cue_temporal_layers=int(kwargs.get("cue_temporal_layers", 1)),
             dropout=float(kwargs.get("dropout", 0.1)),
             use_constant_velocity_residual=bool(kwargs.get("use_constant_velocity_residual", True)),
             residual_scale=float(kwargs.get("residual_scale", 1.0)),
             num_modes=int(kwargs.get("num_modes", 1)),
         )
+        if model_cls is EpisodicLongTermCueMemoryPathPredictor:
+            common_kwargs.update(
+                long_memory_type=str(kwargs.get("long_memory_type", "gated_attention")),
+                long_memory_slots=(
+                    None
+                    if kwargs.get("long_memory_slots", None) is None
+                    else int(kwargs.get("long_memory_slots"))
+                ),
+                long_memory_use_ego=bool(kwargs.get("long_memory_use_ego", True)),
+                detach_long_memory=bool(kwargs.get("detach_long_memory", True)),
+            )
+        return model_cls(**common_kwargs)
     raise ValueError(f"Unknown model: {model_name}")
 
 
-def needs_rgb(model_name: str) -> bool:
+def needs_rgb(model_name: str, backbone_name: str | None = None) -> bool:
+    if backbone_name is not None and backbone_name.lower() in {"zero_tokens", "zero_visual", "no_visual"}:
+        return False
     return model_name.lower() in {
         "last_frame_dino",
         "video_history_dino",
         "xu_pixels_only_baseline",
         "cue_memory_path_predictor",
+        "episodic_long_term_cue_memory_path_predictor",
+        "episodic_cue_memory_path_predictor",
     }

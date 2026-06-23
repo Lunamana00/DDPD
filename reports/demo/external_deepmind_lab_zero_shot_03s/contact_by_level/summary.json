@@ -1,0 +1,122 @@
+[
+  {
+    "group": "lt_chasm",
+    "case": "easy",
+    "sample_id": "deepmind_lab_demo_001__episode_000004_t000034",
+    "ADE": 117.52445983886719,
+    "FDE": 201.21104431152344,
+    "constant_velocity_ADE": 0.0,
+    "constant_velocity_FDE": 0.0,
+    "image": "lt_chasm/easy_01.png"
+  },
+  {
+    "group": "lt_chasm",
+    "case": "hard",
+    "sample_id": "deepmind_lab_demo_001__episode_000004_t000016",
+    "ADE": 238.03651428222656,
+    "FDE": 416.41290283203125,
+    "constant_velocity_ADE": 422.91796875,
+    "constant_velocity_FDE": 792.9711303710938,
+    "image": "lt_chasm/hard_02.png"
+  },
+  {
+    "group": "lt_chasm",
+    "case": "failure",
+    "sample_id": "deepmind_lab_demo_001__episode_000004_t000031",
+    "ADE": 133.50808715820312,
+    "FDE": 221.95968627929688,
+    "constant_velocity_ADE": 0.0,
+    "constant_velocity_FDE": 0.0,
+    "image": "lt_chasm/failure_03.png"
+  },
+  {
+    "group": "nav_maze_random_goal_01",
+    "case": "easy",
+    "sample_id": "deepmind_lab_demo_001__episode_000002_t000023",
+    "ADE": 26.77412986755371,
+    "FDE": 32.14995574951172,
+    "constant_velocity_ADE": 38.7997932434082,
+    "constant_velocity_FDE": 123.0154037475586,
+    "image": "nav_maze_random_goal_01/easy_01.png"
+  },
+  {
+    "group": "nav_maze_random_goal_01",
+    "case": "hard",
+    "sample_id": "deepmind_lab_demo_001__episode_000002_t000008",
+    "ADE": 244.22415161132812,
+    "FDE": 329.4557189941406,
+    "constant_velocity_ADE": 354.5701599121094,
+    "constant_velocity_FDE": 604.2063598632812,
+    "image": "nav_maze_random_goal_01/hard_02.png"
+  },
+  {
+    "group": "nav_maze_random_goal_01",
+    "case": "failure",
+    "sample_id": "deepmind_lab_demo_001__episode_000002_t000004",
+    "ADE": 149.1930389404297,
+    "FDE": 158.07672119140625,
+    "constant_velocity_ADE": 58.73213195800781,
+    "constant_velocity_FDE": 87.28080749511719,
+    "image": "nav_maze_random_goal_01/failure_03.png"
+  },
+  {
+    "group": "nav_maze_static_01",
+    "case": "easy",
+    "sample_id": "deepmind_lab_demo_001__episode_000001_t000029",
+    "ADE": 84.57553100585938,
+    "FDE": 65.3293685913086,
+    "constant_velocity_ADE": 53.142539978027344,
+    "constant_velocity_FDE": 110.60365295410156,
+    "image": "nav_maze_static_01/easy_01.png"
+  },
+  {
+    "group": "nav_maze_static_01",
+    "case": "hard",
+    "sample_id": "deepmind_lab_demo_001__episode_000001_t000020",
+    "ADE": 299.6348571777344,
+    "FDE": 556.4082641601562,
+    "constant_velocity_ADE": 518.997314453125,
+    "constant_velocity_FDE": 930.5455322265625,
+    "image": "nav_maze_static_01/hard_02.png"
+  },
+  {
+    "group": "nav_maze_static_01",
+    "case": "failure",
+    "sample_id": "deepmind_lab_demo_001__episode_000001_t000034",
+    "ADE": 114.94615173339844,
+    "FDE": 148.6279296875,
+    "constant_velocity_ADE": 64.32406616210938,
+    "constant_velocity_FDE": 55.58430862426758,
+    "image": "nav_maze_static_01/failure_03.png"
+  },
+  {
+    "group": "seekavoid_arena_01",
+    "case": "easy",
+    "sample_id": "deepmind_lab_demo_001__episode_000003_t000034",
+    "ADE": 95.35810852050781,
+    "FDE": 182.89410400390625,
+    "constant_velocity_ADE": 76.37745666503906,
+    "constant_velocity_FDE": 52.351192474365234,
+    "image": "seekavoid_arena_01/easy_01.png"
+  },
+  {
+    "group": "seekavoid_arena_01",
+    "case": "hard",
+    "sample_id": "deepmind_lab_demo_001__episode_000003_t000025",
+    "ADE": 407.22161865234375,
+    "FDE": 774.48388671875,
+    "constant_velocity_ADE": 565.5419921875,
+    "constant_velocity_FDE": 1002.29931640625,
+    "image": "seekavoid_arena_01/hard_02.png"
+  },
+  {
+    "group": "seekavoid_arena_01",
+    "case": "failure",
+    "sample_id": "deepmind_lab_demo_001__episode_000003_t000013",
+    "ADE": 466.8262939453125,
+    "FDE": 656.557861328125,
+    "constant_velocity_ADE": 336.7882385253906,
+    "constant_velocity_FDE": 517.7068481445312,
+    "image": "seekavoid_arena_01/failure_03.png"
+  }
+]

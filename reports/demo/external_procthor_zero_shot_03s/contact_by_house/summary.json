@@ -1,0 +1,62 @@
+[
+  {
+    "group": "procthor_seed_1202",
+    "case": "easy",
+    "sample_id": "procthor_demo_001__episode_000001_t000033",
+    "ADE": 110.20631408691406,
+    "FDE": 187.22528076171875,
+    "constant_velocity_ADE": 0.4626714587211609,
+    "constant_velocity_FDE": 1.25,
+    "image": "procthor_seed_1202/easy_01.png"
+  },
+  {
+    "group": "procthor_seed_1202",
+    "case": "hard",
+    "sample_id": "procthor_demo_001__episode_000001_t000007",
+    "ADE": 18.966915130615234,
+    "FDE": 29.773845672607422,
+    "constant_velocity_ADE": 1.0617291927337646,
+    "constant_velocity_FDE": 1.8027756214141846,
+    "image": "procthor_seed_1202/hard_02.png"
+  },
+  {
+    "group": "procthor_seed_1202",
+    "case": "failure",
+    "sample_id": "procthor_demo_001__episode_000001_t000005",
+    "ADE": 147.3708038330078,
+    "FDE": 234.8526153564453,
+    "constant_velocity_ADE": 1.5363448858261108,
+    "constant_velocity_FDE": 3.162277936935425,
+    "image": "procthor_seed_1202/failure_03.png"
+  },
+  {
+    "group": "procthor_seed_1203",
+    "case": "easy",
+    "sample_id": "procthor_demo_001__episode_000002_t000029",
+    "ADE": 72.09680938720703,
+    "FDE": 114.80843353271484,
+    "constant_velocity_ADE": 0.3441200256347656,
+    "constant_velocity_FDE": 0.7071067690849304,
+    "image": "procthor_seed_1203/easy_01.png"
+  },
+  {
+    "group": "procthor_seed_1203",
+    "case": "hard",
+    "sample_id": "procthor_demo_001__episode_000002_t000025",
+    "ADE": 17.449466705322266,
+    "FDE": 28.06999969482422,
+    "constant_velocity_ADE": 3.2836804389953613,
+    "constant_velocity_FDE": 6.005206108093262,
+    "image": "procthor_seed_1203/hard_02.png"
+  },
+  {
+    "group": "procthor_seed_1203",
+    "case": "failure",
+    "sample_id": "procthor_demo_001__episode_000002_t000032",
+    "ADE": 125.55357360839844,
+    "FDE": 206.91107177734375,
+    "constant_velocity_ADE": 1.185766577720642,
+    "constant_velocity_FDE": 2.7613401412963867,
+    "image": "procthor_seed_1203/failure_03.png"
+  }
+]

@@ -52,6 +52,20 @@ class SmallCNNTokenEncoder(nn.Module):
         return tokens.reshape(batch, time, tokens.shape[1], self.out_dim)
 
 
+class ZeroVisualTokenEncoder(nn.Module):
+    """A no-visual encoder that preserves the token interface for ablations."""
+
+    def __init__(self, out_dim: int = 128, token_count: int = 64) -> None:
+        super().__init__()
+        self.out_dim = out_dim
+        self.token_count = token_count
+
+    def forward(self, frames: torch.Tensor) -> torch.Tensor:
+        # frames: [B, T, C, H, W]
+        batch, time = frames.shape[:2]
+        return frames.new_zeros((batch, time, self.token_count, self.out_dim))
+
+
 class DinoV2TokenEncoder(nn.Module):
     """Optional DINOv2 token encoder via transformers.
 
@@ -292,6 +306,8 @@ def build_visual_encoder(backbone_name: str, hidden_dim: int, freeze_backbone: b
             for param in encoder.parameters():
                 param.requires_grad = False
         return encoder
+    if name in {"zero_tokens", "zero_visual", "no_visual"}:
+        return ZeroVisualTokenEncoder(out_dim=hidden_dim)
     if name in CachedVisualTokenEncoder.MODEL_DIMS:
         return CachedVisualTokenEncoder(CachedVisualTokenEncoder.MODEL_DIMS[name])
     if name in {"dinov2", "dino", "facebook/dinov2-small"}:

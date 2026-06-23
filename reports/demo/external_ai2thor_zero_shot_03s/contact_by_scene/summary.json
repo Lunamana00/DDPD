@@ -1,0 +1,62 @@
+[
+  {
+    "group": "FloorPlan1",
+    "case": "easy",
+    "sample_id": "ai2thor_demo_001__episode_000001_t000030",
+    "ADE": 35.00185012817383,
+    "FDE": 55.02093505859375,
+    "constant_velocity_ADE": 0.23004478216171265,
+    "constant_velocity_FDE": 0.7071070671081543,
+    "image": "FloorPlan1/easy_01.png"
+  },
+  {
+    "group": "FloorPlan1",
+    "case": "hard",
+    "sample_id": "ai2thor_demo_001__episode_000001_t000004",
+    "ADE": 11.669175148010254,
+    "FDE": 20.64902114868164,
+    "constant_velocity_ADE": 1.0219178199768066,
+    "constant_velocity_FDE": 2.000000238418579,
+    "image": "FloorPlan1/hard_02.png"
+  },
+  {
+    "group": "FloorPlan1",
+    "case": "failure",
+    "sample_id": "ai2thor_demo_001__episode_000001_t000017",
+    "ADE": 144.57005310058594,
+    "FDE": 235.05450439453125,
+    "constant_velocity_ADE": 1.4447020292282104,
+    "constant_velocity_FDE": 2.7950849533081055,
+    "image": "FloorPlan1/failure_03.png"
+  },
+  {
+    "group": "FloorPlan201",
+    "case": "easy",
+    "sample_id": "ai2thor_demo_001__episode_000002_t000034",
+    "ADE": 77.49522399902344,
+    "FDE": 137.12428283691406,
+    "constant_velocity_ADE": 0.0,
+    "constant_velocity_FDE": 0.0,
+    "image": "FloorPlan201/easy_01.png"
+  },
+  {
+    "group": "FloorPlan201",
+    "case": "hard",
+    "sample_id": "ai2thor_demo_001__episode_000002_t000019",
+    "ADE": 6.6983819007873535,
+    "FDE": 5.612584590911865,
+    "constant_velocity_ADE": 1.5431402921676636,
+    "constant_velocity_FDE": 2.0615527629852295,
+    "image": "FloorPlan201/hard_02.png"
+  },
+  {
+    "group": "FloorPlan201",
+    "case": "failure",
+    "sample_id": "ai2thor_demo_001__episode_000002_t000030",
+    "ADE": 114.73409271240234,
+    "FDE": 198.5866241455078,
+    "constant_velocity_ADE": 1.6970560550689697,
+    "constant_velocity_FDE": 3.1819798946380615,
+    "image": "FloorPlan201/failure_03.png"
+  }
+]
